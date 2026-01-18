@@ -162,7 +162,7 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
 
             // Trigger n8n Webhook (Background Process)
             try {
-                fetch('https://up-seo-2025.app.n8n.cloud/webhook-test/chat', {
+                fetch('https://up-seo-2025.app.n8n.cloud/webhook/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
