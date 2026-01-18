@@ -159,6 +159,23 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                 timestamp: serverTimestamp()
             });
             setChatInput('');
+
+            // Trigger n8n Webhook (Background Process)
+            try {
+                fetch('https://up-seo-2025.app.n8n.cloud/webhook-test/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: chatInput,
+                        sessionId: projectId, // Using projectId as session for project chat
+                        role: 'user',
+                        agent: 'Builder',
+                        timestamp: new Date().toISOString()
+                    })
+                });
+            } catch (err) {
+                console.error("Failed to trigger n8n", err);
+            }
         } catch (error) {
             console.error("Error sending message:", error);
         }

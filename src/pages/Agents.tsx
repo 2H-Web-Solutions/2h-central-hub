@@ -63,6 +63,23 @@ export default function Agents() {
                 agentId: activeAgentId
             });
             setInput('');
+
+            // Trigger n8n Webhook (Background Process)
+            try {
+                fetch('https://up-seo-2025.app.n8n.cloud/webhook-test/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: input,
+                        sessionId: 'default-session',
+                        role: 'user',
+                        agent: agents.find(a => a.id === activeAgentId)?.name || 'Unknown Agent',
+                        timestamp: new Date().toISOString()
+                    })
+                });
+            } catch (err) {
+                console.error("Failed to trigger n8n", err);
+            }
         } catch (error) {
             console.error("Error sending message: ", error);
         }
@@ -81,8 +98,8 @@ export default function Agents() {
                             key={agent.id}
                             onClick={() => setActiveAgentId(agent.id)}
                             className={`p-4 rounded-xl border cursor-pointer transition-all ${activeAgentId === agent.id
-                                    ? 'bg-white border-brand-lime shadow-md'
-                                    : 'bg-white border-gray-100 opacity-70 hover:opacity-100'
+                                ? 'bg-white border-brand-lime shadow-md'
+                                : 'bg-white border-gray-100 opacity-70 hover:opacity-100'
                                 }`}
                         >
                             <h3 className="font-bold text-brand-black">{agent.name}</h3>
@@ -108,8 +125,8 @@ export default function Agents() {
                             >
                                 <div
                                     className={`max-w-[70%] px-4 py-2 rounded-2xl text-sm ${msg.role === 'user'
-                                            ? 'bg-[#B7EF02] text-brand-black rounded-tr-none'
-                                            : 'bg-white border border-gray-200 text-gray-700 rounded-tl-none shadow-sm'
+                                        ? 'bg-[#B7EF02] text-brand-black rounded-tr-none'
+                                        : 'bg-white border border-gray-200 text-gray-700 rounded-tl-none shadow-sm'
                                         }`}
                                 >
                                     {msg.content}
