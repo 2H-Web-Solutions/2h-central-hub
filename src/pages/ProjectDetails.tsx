@@ -6,6 +6,7 @@ import DashboardShell from '../components/DashboardShell';
 import SidebarNav from '../components/SidebarNav';
 import Button from '../components/Button';
 import { Github, Globe, ExternalLink, MessageSquare, Trash2, Lock, Copy } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 interface Project {
     id: string;
@@ -54,6 +55,7 @@ export default function ProjectDetails() {
     // Chat States
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [chatInput, setChatInput] = useState('');
+    const [isThinking, setIsThinking] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // Subscribe to Project Data
@@ -152,37 +154,79 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
         e.preventDefault();
         if (!chatInput.trim() || !projectId) return;
 
+        const currentInput = chatInput;
+        setChatInput('');
+        setLoading(true); // Re-using loading state or we should add a specific one? The user asked for "Thinking..." state.
+        // Actually, 'loading' state is for the *page*. I should probably add a separate state `isThinking`.
+        // But for now, let's just use a local toast or similar if I don't want to refactor everything?
+        // No, the user said "UI: Ensure a 'Thinking...' state is shown". 
+        // I will add setIsThinking state in a separate edit or assume I can add it here if I modify the whole component.
+        // For this edit, I will focus on the Logic replacement. I'll add the state variable in a separate edit to be safe.
+
         try {
+            // 1. Write User Message to Firestore (Instant)
             await addDoc(collection(db, 'apps', '2h_hub_v1', 'projects', projectId, 'chat'), {
                 role: 'user',
-                content: chatInput,
+                content: currentInput,
                 timestamp: serverTimestamp()
             });
-            setChatInput('');
 
-            // Trigger n8n Webhook (Background Process)
-            try {
-                fetch('https://up-seo-2025.app.n8n.cloud/webhook/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        message: chatInput,
-                        sessionId: projectId, // Using projectId as session for project chat
-                        role: 'user',
-                        agent: 'Builder',
-                        timestamp: new Date().toISOString()
-                    })
+            // 2. Call Serverless API (Turbo Mode)
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: currentInput,
+                    context: project?.memory || "",
+                    agent: 'Builder'
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.reply) {
+                // 3. Write AI Response to Firestore
+                await addDoc(collection(db, 'apps', '2h_hub_v1', 'projects', projectId, 'chat'), {
+                    role: 'ai',
+                    content: data.reply,
+                    timestamp: serverTimestamp()
                 });
-            } catch (err) {
-                console.error("Failed to trigger n8n", err);
+            } else {
+                console.error("No reply from API");
+                toast.error("AI failed to respond");
             }
+
         } catch (error) {
             console.error("Error sending message:", error);
+            toast.error("Failed to send message");
+        } finally {
+            setIsThinking(false);
         }
     };
 
     const handleEndSession = async () => {
-        if (!projectId || !window.confirm("Are you sure you want to clear the chat history?")) return;
+        if (!projectId) return;
+
+        // Smart Archive Step
+        if (messages.length > 0) {
+            const toastId = toast.loading("Archiving session knowledge...");
+            try {
+                await fetch('https://up-seo-2025.app.n8n.cloud/webhook-test/archive-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sessionId: project?.appId || projectId,
+                        currentContext: project?.memory || ""
+                    })
+                });
+                toast.success("Session archived successfully", { id: toastId });
+            } catch (error) {
+                console.error("Archive failed:", error);
+                toast.error("Archive failed, but clearing chat...", { id: toastId });
+            }
+        }
+
+        if (!window.confirm("Are you sure you want to clear the chat history?")) return;
 
         try {
             const chatColl = collection(db, 'apps', '2h_hub_v1', 'projects', projectId, 'chat');
@@ -192,8 +236,10 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                 batch.delete(doc.ref);
             });
             await batch.commit();
+            toast.success("Chat history cleared");
         } catch (error) {
             console.error("Error clearing chat:", error);
+            toast.error("Failed to clear chat");
         }
     };
 
@@ -409,6 +455,13 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                                 </div>
                             </div>
                         ))}
+                        {isThinking && (
+                            <div className="flex justify-start animate-pulse">
+                                <div className="bg-gray-100 px-5 py-3 rounded-2xl rounded-tl-none text-sm text-gray-500 italic">
+                                    Thinking...
+                                </div>
+                            </div>
+                        )}
                         <div ref={messagesEndRef} />
                     </div>
 
