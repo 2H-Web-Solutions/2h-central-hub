@@ -80,15 +80,26 @@ export default function Projects() {
     const navigate = useNavigate();
     const [projects, setProjects] = useState<Project[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [folders, setFolders] = useState<Folder[]>([]); // New State
+
     const [loading, setLoading] = useState(true);
 
     // Navigation State
     const [currentView, setCurrentView] = useState<'root' | 'client'>('root');
     const [viewClient, setViewClient] = useState<Client | null>(null);
+    const [viewFolder, setViewFolder] = useState<Folder | null>(null); // New State
+
+    // Modal States
+    const [isWizardOpen, setIsWizardOpen] = useState(false);
+    const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
+    const [renamingFolder, setRenamingFolder] = useState<Folder | null>(null);
+
+    // Form State (Folder)
+    const [folderName, setFolderName] = useState('');
 
     // Delete State
     const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
+    const [deletingFolderId, setDeletingFolderId] = useState<string | null>(null);
 
     // Form State (Wizard)
     const [selectedClientId, setSelectedClientId] = useState('');
@@ -131,6 +142,16 @@ export default function Projects() {
         });
         return () => unsubscribe();
     }, []);
+
+    // Subscribe to Folders
+    useEffect(() => {
+        const q = query(collection(db, 'apps', '2h_hub_v1', 'folders'), orderBy('name'));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            setFolders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Folder)));
+        });
+        return () => unsubscribe();
+    }, []);
+
 
     // Generate Prompt Effect
     useEffect(() => {
@@ -200,7 +221,7 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
         if (viewClient) {
             setSelectedClientId(viewClient.id);
         }
-        setIsModalOpen(true);
+        setIsWizardOpen(true);
     };
 
     const handleCreateProject = async () => {
@@ -213,6 +234,7 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
                 appId,
                 clientId: selectedClient.id,
                 clientName: selectedClient.companyName,
+                folderId: viewFolder?.id || null, // ASSIGN TO FOLDER
                 type: appType,
                 name: appName || appType,
                 createdAt: serverTimestamp(),
@@ -226,11 +248,62 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
                     appId: fbAppId
                 }
             });
-            setIsModalOpen(false);
+            setIsWizardOpen(false);
             resetForm();
         } catch (error) {
             console.error("Error creating project: ", error);
             alert("Failed to create project");
+        }
+    };
+
+    // FOLDER OPERATIONS
+    const handleCreateFolder = async () => {
+        if (!viewClient || !folderName.trim()) return;
+        try {
+            await addDoc(collection(db, 'apps', '2h_hub_v1', 'folders'), {
+                name: folderName,
+                clientId: viewClient.id,
+                createdAt: serverTimestamp()
+            });
+            setFolderName('');
+            setIsFolderModalOpen(false);
+        } catch (error) {
+            console.error("Error creating folder: ", error);
+            alert("Failed to create folder");
+        }
+    };
+
+    const handleRenameFolder = async () => {
+        if (!renamingFolder || !folderName.trim()) return;
+        try {
+            await updateDoc(doc(db, 'apps', '2h_hub_v1', 'folders', renamingFolder.id), {
+                name: folderName
+            });
+            setRenamingFolder(null);
+            setFolderName('');
+        } catch (error) {
+            console.error("Error renaming folder: ", error);
+            alert("Failed to rename folder");
+        }
+    };
+
+    const handleDeleteFolder = async () => {
+        if (!deletingFolderId) return;
+
+        // Check if empty
+        const projectsInFolder = projects.filter(p => p.folderId === deletingFolderId);
+        if (projectsInFolder.length > 0) {
+            alert("Cannot delete non-empty folder. Please delete or move apps first.");
+            setDeletingFolderId(null);
+            return;
+        }
+
+        try {
+            await deleteDoc(doc(db, 'apps', '2h_hub_v1', 'folders', deletingFolderId));
+            setDeletingFolderId(null);
+        } catch (error) {
+            console.error("Error deleting folder: ", error);
+            alert("Failed to delete folder");
         }
     };
 
@@ -250,9 +323,20 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
         alert("Prompt copied to clipboard!");
     };
 
-    // Filter projects for view
+    // FILTER LOGIC
+    // 1. Folders: Only show folders for this client
+    const visibleFolders = viewClient
+        ? folders.filter(f => f.clientId === viewClient.id)
+        : [];
+
+    // 2. Projects: 
+    //    - Must match client
+    //    - Must match folder (if viewFolder is set, match id; otherwise, match null/undefined)
     const visibleProjects = viewClient
-        ? projects.filter(p => p.clientId === viewClient.id)
+        ? projects.filter(p =>
+            p.clientId === viewClient.id &&
+            (viewFolder ? p.folderId === viewFolder.id : !p.folderId)
+        )
         : [];
 
     return (
@@ -260,13 +344,32 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
             headerTitle="App Factory"
             sidebarContent={<SidebarNav />}
             headerActions={
-                <Button onClick={handleOpenWizard}>Create New App</Button>
+                <div className="flex gap-2">
+                    {/* New App Button - Always Visible if we can create apps */}
+                    <Button onClick={handleOpenWizard}>Create New App</Button>
+
+                    {/* New Folder Button - Only visible inside a client view, but NOT deep inside a folder? 
+                        Actually, sub-sub folders are not requested, just 1 level. 
+                        So show only if in Client View AND NOT in a Subfolder. 
+                    */}
+                    {currentView === 'client' && !viewFolder && (
+                        <div className="relative">
+                            <button
+                                onClick={() => setIsFolderModalOpen(true)}
+                                className="h-10 w-10 bg-yellow-100 hover:bg-yellow-200 text-yellow-700 rounded-lg flex items-center justify-center transition-colors"
+                                title="New Folder"
+                            >
+                                <FolderInput size={20} />
+                            </button>
+                        </div>
+                    )}
+                </div>
             }
         >
             {/* Breadcrumbs */}
             <div className="flex items-center gap-2 mb-6 text-sm text-gray-500">
                 <button
-                    onClick={() => { setCurrentView('root'); setViewClient(null); }}
+                    onClick={() => { setCurrentView('root'); setViewClient(null); setViewFolder(null); }}
                     className="hover:text-brand-lime flex items-center gap-1 transition-colors"
                 >
                     <Home size={14} /> Clients
@@ -274,7 +377,18 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
                 {viewClient && (
                     <>
                         <ChevronRight size={14} />
-                        <span className="font-medium text-brand-black">{viewClient.companyName}</span>
+                        <button
+                            onClick={() => setViewFolder(null)}
+                            className={`hover:text-brand-lime transition-colors ${!viewFolder ? 'font-medium text-brand-black' : ''}`}
+                        >
+                            {viewClient.companyName}
+                        </button>
+                    </>
+                )}
+                {viewFolder && (
+                    <>
+                        <ChevronRight size={14} />
+                        <span className="font-medium text-brand-black">{viewFolder.name}</span>
                     </>
                 )}
             </div>
@@ -282,72 +396,158 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
             {loading ? (
                 <p className="text-brand-text-muted">Loading...</p>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {currentView === 'root' ? (
-                        // CLIENT FOLDERS
-                        clients.map(client => (
-                            <div
-                                key={client.id}
-                                onClick={() => { setViewClient(client); setCurrentView('client'); }}
-                                className="bg-white border border-gray-100 rounded-xl p-6 shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col items-center justify-center gap-4 py-12"
-                            >
-                                <Folder size={48} className="text-brand-lime group-hover:scale-110 transition-transform" />
-                                <h3 className="text-lg font-serif font-bold text-brand-black">{client.companyName}</h3>
-                            </div>
-                        ))
-                    ) : (
-                        // APP CARDS
-                        <>
-                            {visibleProjects.length === 0 ? (
-                                <div className="col-span-full flex flex-col items-center justify-center p-12 text-gray-400 border border-dashed border-gray-200 rounded-xl">
-                                    <AppWindow size={48} className="mb-4 opacity-20" />
-                                    <p>No apps found for {viewClient?.companyName}.</p>
-                                    <button onClick={handleOpenWizard} className="text-brand-lime hover:underline mt-2">Create First App</button>
+                <div className="space-y-8">
+                    {/* LEVEL 1: ROOT (CLIENTS) */}
+                    {currentView === 'root' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {clients.map(client => (
+                                <div
+                                    key={client.id}
+                                    onClick={() => { setViewClient(client); setCurrentView('client'); }}
+                                    className="bg-white border border-gray-100 rounded-xl p-6 shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col items-center justify-center gap-4 py-12"
+                                >
+                                    <Folder size={48} className="text-brand-lime group-hover:scale-110 transition-transform" />
+                                    <h3 className="text-lg font-serif font-bold text-brand-black">{client.companyName}</h3>
                                 </div>
-                            ) : (
-                                visibleProjects.map(project => (
-                                    <div
-                                        key={project.id}
-                                        onClick={() => navigate(`/projects/${project.id}`)}
-                                        className="bg-white border border-gray-100 rounded-xl p-6 shadow-sm hover:shadow-md transition-all relative group cursor-pointer"
-                                    >
-                                        {/* Delete Action */}
-                                        <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); setDeletingProjectId(project.id); }}
-                                                className="p-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors"
-                                                title="Delete Project"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
+                            ))}
+                        </div>
+                    )}
 
-                                        <div className="flex items-start gap-4 mb-3">
-                                            <div className="p-3 bg-gray-50 rounded-lg text-brand-lime">
-                                                <Layout size={24} />
+                    {/* LEVEL 2: CLIENT VIEW */}
+                    {currentView === 'client' && (
+                        <>
+                            {/* FOLDERS GRID (Only visible at root of client) */}
+                            {!viewFolder && visibleFolders.length > 0 && (
+                                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
+                                    {visibleFolders.map(folder => (
+                                        <div
+                                            key={folder.id}
+                                            onClick={() => setViewFolder(folder)}
+                                            className="bg-yellow-50/50 border border-yellow-100 hover:border-yellow-300 rounded-xl p-4 flex items-center justify-between group cursor-pointer transition-all"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <Folder size={24} className="text-yellow-500 fill-yellow-500/20" />
+                                                <span className="font-medium text-gray-800">{folder.name}</span>
                                             </div>
-                                            <div>
-                                                <h3 className="text-lg font-serif font-bold text-brand-black leading-tight">{project.name || project.type}</h3>
-                                                <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mt-1">{project.type}</p>
+                                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setRenamingFolder(folder); setFolderName(folder.name); }}
+                                                    className="p-1.5 hover:bg-yellow-100 rounded-md text-yellow-600"
+                                                >
+                                                    <Pencil size={14} />
+                                                </button>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setDeletingFolderId(folder.id); }}
+                                                    className="p-1.5 hover:bg-red-100 rounded-md text-red-500"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
                                             </div>
                                         </div>
-
-                                        <div className="bg-gray-50 rounded-lg p-2 border border-gray-100 font-mono text-[10px] text-gray-400 break-all truncate">
-                                            {project.appId}
-                                        </div>
-                                    </div>
-                                ))
+                                    ))}
+                                </div>
                             )}
+
+                            {/* APPS GRID */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {visibleProjects.length === 0 ? (
+                                    <div className="col-span-full flex flex-col items-center justify-center p-12 text-gray-400 border border-dashed border-gray-200 rounded-xl">
+                                        <AppWindow size={48} className="mb-4 opacity-20" />
+                                        <p>No apps found in {viewFolder ? viewFolder.name : viewClient?.companyName}.</p>
+                                        <button onClick={handleOpenWizard} className="text-brand-lime hover:underline mt-2">Create App Here</button>
+                                    </div>
+                                ) : (
+                                    visibleProjects.map(project => (
+                                        <div
+                                            key={project.id}
+                                            onClick={() => navigate(`/projects/${project.id}`)}
+                                            className="bg-white border border-gray-100 rounded-xl p-6 shadow-sm hover:shadow-md transition-all relative group cursor-pointer"
+                                        >
+                                            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setDeletingProjectId(project.id); }}
+                                                    className="p-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors"
+                                                    title="Delete Project"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+
+                                            <div className="flex items-start gap-4 mb-3">
+                                                <div className="p-3 bg-gray-50 rounded-lg text-brand-lime">
+                                                    <Layout size={24} />
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-lg font-serif font-bold text-brand-black leading-tight">{project.name || project.type}</h3>
+                                                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mt-1">{project.type}</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="bg-gray-50 rounded-lg p-2 border border-gray-100 font-mono text-[10px] text-gray-400 break-all truncate">
+                                                {project.appId}
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
                         </>
                     )}
                 </div>
             )}
 
+            {/* Create Folder Modal */}
+            {isFolderModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white rounded-xl p-6 w-full max-w-sm shadow-xl">
+                        <h3 className="text-lg font-bold mb-4">New Folder</h3>
+                        <input
+                            autoFocus
+                            type="text"
+                            className="w-full px-4 py-2 border rounded-lg mb-4 outline-none focus:border-brand-lime"
+                            placeholder="Folder Name (e.g. Archives)"
+                            value={folderName}
+                            onChange={(e) => setFolderName(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleCreateFolder()}
+                        />
+                        <div className="flex gap-2">
+                            <Button variant="secondary" onClick={() => setIsFolderModalOpen(false)} className="flex-1">Cancel</Button>
+                            <Button variant="primary" onClick={handleCreateFolder} className="flex-1">Create</Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Rename Folder Modal */}
+            {renamingFolder && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white rounded-xl p-6 w-full max-w-sm shadow-xl">
+                        <h3 className="text-lg font-bold mb-4">Rename Folder</h3>
+                        <input
+                            autoFocus
+                            type="text"
+                            className="w-full px-4 py-2 border rounded-lg mb-4 outline-none focus:border-brand-lime"
+                            value={folderName}
+                            onChange={(e) => setFolderName(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleRenameFolder()}
+                        />
+                        <div className="flex gap-2">
+                            <Button variant="secondary" onClick={() => { setRenamingFolder(null); setFolderName(''); }} className="flex-1">Cancel</Button>
+                            <Button variant="primary" onClick={handleRenameFolder} className="flex-1">Save</Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Wizard Modal */}
-            {isModalOpen && (
+            {isWizardOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm overflow-y-auto py-10">
                     <div className="bg-white rounded-xl p-8 w-full max-w-4xl shadow-2xl relative my-auto">
-                        <h3 className="text-2xl font-serif font-bold text-brand-black mb-6">New App Wizard</h3>
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-2xl font-serif font-bold text-brand-black">New App Wizard</h3>
+                            <button onClick={() => setIsWizardOpen(false)} className="text-gray-400 hover:text-gray-600">
+                                <X size={24} />
+                            </button>
+                        </div>
 
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                             {/* Left: Inputs */}
@@ -494,7 +694,7 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
                         </div>
 
                         <div className="flex gap-3 mt-8 pt-6 border-t">
-                            <Button type="button" variant="secondary" onClick={() => setIsModalOpen(false)} className="flex-1">
+                            <Button type="button" variant="secondary" onClick={() => setIsWizardOpen(false)} className="flex-1">
                                 Cancel
                             </Button>
                             <Button type="button" variant="primary" onClick={handleCreateProject} className="flex-1" disabled={!selectedClient}>
