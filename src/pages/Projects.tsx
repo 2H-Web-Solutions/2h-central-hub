@@ -5,7 +5,7 @@ import Button from '../components/Button';
 import DashboardShell from '../components/DashboardShell';
 import SidebarNav from '../components/SidebarNav';
 import SecureDeleteModal from '../components/SecureDeleteModal';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Folder, AppWindow, ChevronRight, Home, Layout } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface Project {
@@ -14,6 +14,7 @@ interface Project {
     clientId: string;
     clientName: string;
     type: string;
+    name: string;
     repoUrl?: string;
     createdAt?: Timestamp;
     // Firebase Config
@@ -74,10 +75,14 @@ export default function Projects() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [loading, setLoading] = useState(true);
 
+    // Navigation State
+    const [currentView, setCurrentView] = useState<'root' | 'client'>('root');
+    const [viewClient, setViewClient] = useState<Client | null>(null);
+
     // Delete State
     const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
 
-    // Form State
+    // Form State (Wizard)
     const [selectedClientId, setSelectedClientId] = useState('');
     const [appName, setAppName] = useState('');
     const [appType, setAppType] = useState('Central Hub');
@@ -183,6 +188,13 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
         setFbAppId('');
     };
 
+    const handleOpenWizard = () => {
+        if (viewClient) {
+            setSelectedClientId(viewClient.id);
+        }
+        setIsModalOpen(true);
+    };
+
     const handleCreateProject = async () => {
         if (!selectedClient) return;
 
@@ -230,47 +242,95 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
         alert("Prompt copied to clipboard!");
     };
 
+    // Filter projects for view
+    const visibleProjects = viewClient
+        ? projects.filter(p => p.clientId === viewClient.id)
+        : [];
+
     return (
         <DashboardShell
             headerTitle="App Factory"
             sidebarContent={<SidebarNav />}
             headerActions={
-                <Button onClick={() => setIsModalOpen(true)}>Create New App</Button>
+                <Button onClick={handleOpenWizard}>Create New App</Button>
             }
         >
-            {/* List */}
+            {/* Breadcrumbs */}
+            <div className="flex items-center gap-2 mb-6 text-sm text-gray-500">
+                <button
+                    onClick={() => { setCurrentView('root'); setViewClient(null); }}
+                    className="hover:text-brand-lime flex items-center gap-1 transition-colors"
+                >
+                    <Home size={14} /> Clients
+                </button>
+                {viewClient && (
+                    <>
+                        <ChevronRight size={14} />
+                        <span className="font-medium text-brand-black">{viewClient.companyName}</span>
+                    </>
+                )}
+            </div>
+
             {loading ? (
-                <p className="text-brand-text-muted">Loading projects...</p>
+                <p className="text-brand-text-muted">Loading...</p>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {projects.map(project => (
-                        <div
-                            key={project.id}
-                            onClick={() => navigate(`/projects/${project.id}`)}
-                            className="bg-white border border-gray-100 rounded-xl p-6 shadow-sm hover:shadow-md transition-all relative group cursor-pointer"
-                        >
-                            {/* Delete Action */}
-                            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); setDeletingProjectId(project.id); }}
-                                    className="p-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors"
-                                    title="Delete Project"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
+                    {currentView === 'root' ? (
+                        // CLIENT FOLDERS
+                        clients.map(client => (
+                            <div
+                                key={client.id}
+                                onClick={() => { setViewClient(client); setCurrentView('client'); }}
+                                className="bg-white border border-gray-100 rounded-xl p-6 shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col items-center justify-center gap-4 py-12"
+                            >
+                                <Folder size={48} className="text-brand-lime group-hover:scale-110 transition-transform" />
+                                <h3 className="text-lg font-serif font-bold text-brand-black">{client.companyName}</h3>
                             </div>
+                        ))
+                    ) : (
+                        // APP CARDS
+                        <>
+                            {visibleProjects.length === 0 ? (
+                                <div className="col-span-full flex flex-col items-center justify-center p-12 text-gray-400 border border-dashed border-gray-200 rounded-xl">
+                                    <AppWindow size={48} className="mb-4 opacity-20" />
+                                    <p>No apps found for {viewClient?.companyName}.</p>
+                                    <button onClick={handleOpenWizard} className="text-brand-lime hover:underline mt-2">Create First App</button>
+                                </div>
+                            ) : (
+                                visibleProjects.map(project => (
+                                    <div
+                                        key={project.id}
+                                        onClick={() => navigate(`/projects/${project.id}`)}
+                                        className="bg-white border border-gray-100 rounded-xl p-6 shadow-sm hover:shadow-md transition-all relative group cursor-pointer"
+                                    >
+                                        {/* Delete Action */}
+                                        <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setDeletingProjectId(project.id); }}
+                                                className="p-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors"
+                                                title="Delete Project"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
 
-                            <h3 className="text-lg font-serif font-bold text-brand-black mb-1">{project.clientName}</h3>
-                            <p className="text-sm font-medium text-brand-lime mb-3">{project.type}</p>
-                            <div className="bg-gray-50 rounded-lg p-3 border border-gray-100 font-mono text-xs text-brand-text-muted break-all">
-                                {project.appId}
-                            </div>
-                        </div>
-                    ))}
-                    {projects.length === 0 && (
-                        <div className="col-span-full text-center py-12 text-brand-text-muted">
-                            No projects found. Start building!
-                        </div>
+                                        <div className="flex items-start gap-4 mb-3">
+                                            <div className="p-3 bg-gray-50 rounded-lg text-brand-lime">
+                                                <Layout size={24} />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-lg font-serif font-bold text-brand-black leading-tight">{project.name || project.type}</h3>
+                                                <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mt-1">{project.type}</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-gray-50 rounded-lg p-2 border border-gray-100 font-mono text-[10px] text-gray-400 break-all truncate">
+                                            {project.appId}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </>
                     )}
                 </div>
             )}
