@@ -712,6 +712,14 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
                 onConfirm={handleDeleteProject}
                 title="Project"
             />
+
+            {/* Secure Delete Folder Modal */}
+            <SecureDeleteModal
+                isOpen={!!deletingFolderId}
+                onClose={() => setDeletingFolderId(null)}
+                onConfirm={handleDeleteFolder}
+                title="Folder"
+            />
         </DashboardShell>
     );
 }
