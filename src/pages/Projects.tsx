@@ -101,6 +101,9 @@ export default function Projects() {
     const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
     const [deletingFolderId, setDeletingFolderId] = useState<string | null>(null);
 
+    // Move State
+    const [projectToMove, setProjectToMove] = useState<Project | null>(null);
+
     // Form State (Wizard)
     const [selectedClientId, setSelectedClientId] = useState('');
     const [appName, setAppName] = useState('');
@@ -318,6 +321,19 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
         }
     };
 
+    const handleMoveProject = async (targetFolderId: string | null) => {
+        if (!projectToMove) return;
+        try {
+            await updateDoc(doc(db, 'apps', '2h_hub_v1', 'projects', projectToMove.id), {
+                folderId: targetFolderId
+            });
+            setProjectToMove(null);
+        } catch (error) {
+            console.error("Error moving project: ", error);
+            alert("Failed to move project");
+        }
+    };
+
     const copyToClipboard = () => {
         navigator.clipboard.writeText(generatedPrompt);
         alert("Prompt copied to clipboard!");
@@ -463,7 +479,14 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
                                             onClick={() => navigate(`/projects/${project.id}`)}
                                             className="bg-white border border-gray-100 rounded-xl p-6 shadow-sm hover:shadow-md transition-all relative group cursor-pointer"
                                         >
-                                            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setProjectToMove(project); }}
+                                                    className="p-2 bg-gray-100 text-gray-600 rounded-full hover:bg-brand-lime hover:text-brand-black transition-colors"
+                                                    title="Move Project"
+                                                >
+                                                    <FolderInput size={16} />
+                                                </button>
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); setDeletingProjectId(project.id); }}
                                                     className="p-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors"
@@ -720,6 +743,49 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
                 onConfirm={handleDeleteFolder}
                 title="Folder"
             />
+
+            {/* Move Project Modal */}
+            {projectToMove && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white rounded-xl p-6 w-full max-w-sm shadow-xl">
+                        <h3 className="text-lg font-bold mb-4">Move '{projectToMove.name}'</h3>
+                        <p className="text-sm text-gray-500 mb-4">Select a destination folder:</p>
+
+                        <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-2">
+                            {/* Root Option */}
+                            <button
+                                onClick={() => handleMoveProject(null)}
+                                className={`w-full text-left px-4 py-3 rounded-lg border transition-all flex items-center gap-3 ${!projectToMove.folderId ? 'border-brand-lime bg-lime-50' : 'border-gray-100 hover:border-brand-lime hover:bg-gray-50'}`}
+                            >
+                                <div className={`p-2 rounded-full ${!projectToMove.folderId ? 'bg-brand-lime text-brand-black' : 'bg-gray-100 text-gray-500'}`}>
+                                    <Home size={16} />
+                                </div>
+                                <span className="font-medium">Client Root</span>
+                                {!projectToMove.folderId && <span className="text-xs bg-brand-lime px-2 py-0.5 rounded-full ml-auto">Current</span>}
+                            </button>
+
+                            {/* Subfolder Options */}
+                            {folders.filter(f => f.clientId === projectToMove.clientId).map(folder => (
+                                <button
+                                    key={folder.id}
+                                    onClick={() => handleMoveProject(folder.id)}
+                                    className={`w-full text-left px-4 py-3 rounded-lg border transition-all flex items-center gap-3 ${projectToMove.folderId === folder.id ? 'border-brand-lime bg-lime-50' : 'border-gray-100 hover:border-brand-lime hover:bg-gray-50'}`}
+                                >
+                                    <div className={`p-2 rounded-full ${projectToMove.folderId === folder.id ? 'bg-brand-lime text-brand-black' : 'bg-yellow-100 text-yellow-600'}`}>
+                                        <Folder size={16} />
+                                    </div>
+                                    <span className="font-medium">{folder.name}</span>
+                                    {projectToMove.folderId === folder.id && <span className="text-xs bg-brand-lime px-2 py-0.5 rounded-full ml-auto">Current</span>}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="flex gap-2 mt-6">
+                            <Button variant="secondary" onClick={() => setProjectToMove(null)} className="flex-1">Cancel</Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </DashboardShell>
     );
 }
