@@ -37,6 +37,29 @@ interface Client {
     fontBody?: string;
 }
 
+const GENERAL_RULES = `
+## 3. INHERITED GENERAL RULES (DO NOT MODIFY)
+1. CORE ARCHITECTURE (The Single-Backend Law)
+Backend: NEVER create a new backend. Use the existing Firebase Project.
+Auth: Use Firebase Authentication. All data access depends on request.auth != null.
+Scoping: You will be assigned a unique APP_ID. ALL database paths MUST start with: apps/{APP_ID}/...
+NEVER read/write to the root or other app scopes.
+
+2. DATA SCHEMA STANDARDS
+A. TASKS (apps/{APP_ID}/tasks/{taskId}): { title, status, priority, due_date, deep_link }
+B. AI MEMORY (apps/{APP_ID}/memory/{docId}): { session_id, role, content, tags }
+C. n8n TRIGGERS (apps/{APP_ID}/actions/{actionId}): { action_type, payload, status, result }
+
+3. SECURITY
+NO API KEYS IN CODE. Use .env for public keys only. Use 'actions' collection for sensitive ops.
+
+4. TECH STACK
+React (Vite) + Typescript. Tailwind CSS ONLY. Lucide Icons.
+
+5. ERROR HANDLING
+Log runtime errors to apps/{APP_ID}/system_logs/. Show Toast Notifications.
+`.trim();
+
 export default function Projects() {
     const navigate = useNavigate();
     const [projects, setProjects] = useState<Project[]>([]);
@@ -149,6 +172,9 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
 
     const handleCreateProject = async () => {
         if (!selectedClient) return;
+
+        const fullSystemContext = generatedPrompt + "\n\n" + GENERAL_RULES;
+
         try {
             await addDoc(collection(db, 'apps', '2h_hub_v1', 'projects'), {
                 appId,
@@ -156,6 +182,7 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
                 clientName: selectedClient.companyName,
                 type: appType,
                 createdAt: serverTimestamp(),
+                memory: fullSystemContext,
                 firebaseConfig: {
                     apiKey,
                     authDomain,
