@@ -5,7 +5,7 @@ import { db } from '../lib/firebase';
 import DashboardShell from '../components/DashboardShell';
 import SidebarNav from '../components/SidebarNav';
 import Button from '../components/Button';
-import { Github, Globe, ExternalLink, MessageSquare, Trash2, Lock, Copy, Paperclip, X, Archive, Image as ImageIcon } from 'lucide-react';
+import { Github, Globe, ExternalLink, MessageSquare, Trash2, Lock, Copy, Paperclip, X, Archive } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Project {
