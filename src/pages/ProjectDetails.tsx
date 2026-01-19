@@ -90,6 +90,13 @@ export default function ProjectDetails() {
         return () => unsubscribe();
     }, [projectId, navigate]);
 
+    // Sync memory from project
+    useEffect(() => {
+        if (project?.memory) {
+            setMemory(project.memory);
+        }
+    }, [project]);
+
     // Subscribe to Chat Messages
     useEffect(() => {
         if (!projectId) return;

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, addDoc, deleteDoc, doc, onSnapshot, serverTimestamp, query, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, setDoc, deleteDoc, doc, onSnapshot, serverTimestamp, query, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import Button from '../components/Button';
 import DashboardShell from '../components/DashboardShell';
@@ -189,7 +189,7 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
         const fullSystemContext = generatedPrompt + "\n\n" + GLOBAL_RULES;
 
         try {
-            await addDoc(collection(db, 'apps', '2h_hub_v1', 'projects'), {
+            await setDoc(doc(db, 'apps', '2h_hub_v1', 'projects', appId), {
                 appId,
                 clientId: selectedClient.id,
                 clientName: selectedClient.companyName,
