@@ -5,7 +5,7 @@ import { db } from '../lib/firebase';
 import DashboardShell from '../components/DashboardShell';
 import SidebarNav from '../components/SidebarNav';
 import Button from '../components/Button';
-import { Github, Globe, ExternalLink, MessageSquare, Trash2, Lock, Copy } from 'lucide-react';
+import { Github, Globe, ExternalLink, MessageSquare, Trash2, Lock, Copy, Paperclip, X, Archive, Image as ImageIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Project {
@@ -30,6 +30,7 @@ interface ChatMessage {
     id: string;
     role: 'user' | 'ai' | 'system';
     content: string;
+    attachments?: string[]; // Base64 strings
     timestamp: any;
 }
 
@@ -56,7 +57,9 @@ export default function ProjectDetails() {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [chatInput, setChatInput] = useState('');
     const [isThinking, setIsThinking] = useState(false);
+    const [attachments, setAttachments] = useState<string[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Subscribe to Project Data
     useEffect(() => {
@@ -154,15 +157,69 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=${messagingSenderId}
 VITE_FIREBASE_APP_ID=${fbAppId}`;
 
         navigator.clipboard.writeText(envContent);
-        alert("Copied .env block to clipboard!");
+        toast.success("Copied .env block!");
     };
 
-    const handleSendMessage = async (e: React.FormEvent) => {
+    // --- FILE HANDLING ---
+
+    const convertFileToBase64 = (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = error => reject(error);
+        });
+    };
+
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0) {
+            const file = e.target.files[0];
+            const base64 = await convertFileToBase64(file);
+            setAttachments(prev => [...prev, base64]);
+        }
+    };
+
+    const handlePaste = async (e: React.ClipboardEvent) => {
+        const items = e.clipboardData.items;
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+                const file = items[i].getAsFile();
+                if (file) {
+                    const base64 = await convertFileToBase64(file);
+                    setAttachments(prev => [...prev, base64]);
+                }
+            }
+        }
+    };
+
+    const handleDrop = async (e: React.DragEvent) => {
         e.preventDefault();
-        if (!chatInput.trim() || !projectId) return;
+        e.stopPropagation();
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            const file = e.dataTransfer.files[0];
+            if (file.type.startsWith('image/')) {
+                const base64 = await convertFileToBase64(file);
+                setAttachments(prev => [...prev, base64]);
+            }
+        }
+    };
+
+    const removeAttachment = (index: number) => {
+        setAttachments(prev => prev.filter((_, i) => i !== index));
+    };
+
+    // --- SEND LOGIC ---
+
+    const handleSendMessage = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+
+        if ((!chatInput.trim() && attachments.length === 0) || !projectId) return;
 
         const currentInput = chatInput;
+        const currentAttachments = attachments;
+
         setChatInput('');
+        setAttachments([]);
         setIsThinking(true);
 
         try {
@@ -170,6 +227,7 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
             await addDoc(collection(db, 'apps', '2h_hub_v1', 'projects', projectId, 'chat'), {
                 role: 'user',
                 content: currentInput,
+                attachments: currentAttachments,
                 timestamp: serverTimestamp()
             });
 
@@ -178,13 +236,17 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    message: currentInput,
+                    message: currentInput + (currentAttachments.length > 0 ? `\n[With ${currentAttachments.length} images]` : ''),
                     context: project?.memory || "You are a helpful assistant.",
-                    agent: "Builder"
+                    agent: "Builder",
+                    // NOTE: Real multimodal support would require sending the Base64 in a specific format to the API. 
+                    // For now, we assume text-based context or that the API ignores images if not supported.
+                    // If you want actual Vision capabilities, you'd insert the image data here.
+                    images: currentAttachments
                 })
             });
 
-            // Check if response is JSON (Vite returns HTML on 404, which causes crash)
+            // Check if response is JSON
             const contentType = response.headers.get("content-type");
             if (!contentType || !contentType.includes("application/json")) {
                 throw new Error("API not available (Localhost? Deploy to Vercel to test AI).");
@@ -216,29 +278,39 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
         }
     };
 
-    const handleEndSession = async () => {
-        if (!projectId) return;
-
-        // Smart Archive Step
-        if (messages.length > 0) {
-            const toastId = toast.loading("Archiving session knowledge...");
-            try {
-                await fetch('https://up-seo-2025.app.n8n.cloud/webhook-test/archive-session', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        sessionId: project?.appId || projectId,
-                        currentContext: project?.memory || ""
-                    })
-                });
-                toast.success("Session archived successfully", { id: toastId });
-            } catch (error) {
-                console.error("Archive failed:", error);
-                toast.error("Archive failed, but clearing chat...", { id: toastId });
-            }
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && e.ctrlKey) {
+            handleSendMessage();
         }
+    };
 
-        if (!window.confirm("Are you sure you want to clear the chat history?")) return;
+    // --- CHAT MANAGEMENT ---
+
+    const handleSmartArchive = async () => {
+        if (!projectId) return;
+        if (messages.length === 0) return;
+
+        const toastId = toast.loading("Archiving session knowledge...");
+        try {
+            await fetch('https://up-seo-2025.app.n8n.cloud/webhook-test/archive-session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sessionId: project?.appId || projectId,
+                    currentContext: project?.memory || ""
+                })
+            });
+            toast.success("Session archived successfully", { id: toastId });
+            handleWipeChat(); // Clear after archive
+        } catch (error) {
+            console.error("Archive failed:", error);
+            toast.error("Archive failed.", { id: toastId });
+        }
+    };
+
+    const handleWipeChat = async () => {
+        if (!projectId) return;
+        if (!window.confirm("Are you sure you want to WIPE the chat history? This cannot be undone.")) return;
 
         try {
             const chatColl = collection(db, 'apps', '2h_hub_v1', 'projects', projectId, 'chat');
@@ -248,10 +320,10 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                 batch.delete(doc.ref);
             });
             await batch.commit();
-            toast.success("Chat history cleared");
+            toast.success("Chat wiped clean.");
         } catch (error) {
             console.error("Error clearing chat:", error);
-            toast.error("Failed to clear chat");
+            toast.error("Failed to wipe chat");
         }
     };
 
@@ -425,7 +497,11 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                 </div>
 
                 {/* RIGHT COLUMN: Builder Chat */}
-                <div className="w-2/3 flex flex-col bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden relative">
+                <div
+                    className="w-2/3 flex flex-col bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden relative"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={handleDrop}
+                >
                     {/* Chat Header */}
                     <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                         <div>
@@ -435,12 +511,22 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                             </h3>
                             <p className="text-xs text-brand-text-muted">Context Aware • Project Specific</p>
                         </div>
-                        <button
-                            onClick={handleEndSession}
-                            className="text-xs font-medium text-gray-400 hover:text-red-500 flex items-center gap-1 transition-colors"
-                        >
-                            <Trash2 size={14} /> Clear Chat
-                        </button>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleSmartArchive}
+                                className="text-xs font-medium text-gray-500 hover:text-brand-lime bg-white border border-gray-200 px-3 py-1.5 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                                title="Sync memory to n8n & Clear"
+                            >
+                                <Archive size={14} /> Smart Archive
+                            </button>
+                            <button
+                                onClick={handleWipeChat}
+                                className="text-xs font-medium text-red-400 hover:text-red-600 bg-white border border-red-100 hover:border-red-200 px-3 py-1.5 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                                title="Delete messages without saving"
+                            >
+                                <Trash2 size={14} /> Wipe Chat
+                            </button>
+                        </div>
                     </div>
 
                     {/* Messages Area */}
@@ -463,6 +549,14 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                                         : 'bg-gray-100 text-gray-800 rounded-tl-none'
                                         }`}
                                 >
+                                    {/* Attachments */}
+                                    {msg.attachments && msg.attachments.length > 0 && (
+                                        <div className="flex flex-wrap gap-2 mb-2">
+                                            {msg.attachments.map((src, idx) => (
+                                                <img key={idx} src={src} className="max-w-[200px] max-h-[200px] rounded-lg border border-black/10" alt="Attachment" />
+                                            ))}
+                                        </div>
+                                    )}
                                     {msg.content}
                                 </div>
                             </div>
@@ -479,15 +573,58 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
 
                     {/* Input Area */}
                     <div className="p-4 bg-white border-t border-gray-100">
-                        <form onSubmit={handleSendMessage} className="flex gap-2">
+                        {/* Attachment Previews */}
+                        {attachments.length > 0 && (
+                            <div className="flex gap-2 mb-3 overflow-x-auto pb-2">
+                                {attachments.map((src, index) => (
+                                    <div key={index} className="relative group shrink-0">
+                                        <img src={src} className="h-16 w-16 object-cover rounded-lg border border-gray-200" alt="preview" />
+                                        <button
+                                            onClick={() => removeAttachment(index)}
+                                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        >
+                                            <X size={12} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        <form onSubmit={handleSendMessage} className="flex gap-2 items-end">
+                            {/* File Button */}
+                            <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="p-3 text-gray-400 hover:text-brand-lime hover:bg-gray-50 rounded-xl transition-colors"
+                            >
+                                <Paperclip size={20} />
+                            </button>
                             <input
-                                type="text"
-                                className="flex-1 px-4 py-3 rounded-xl border border-gray-200 focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none transition-all bg-gray-50 text-brand-black"
-                                placeholder="Instructions for the builder..."
+                                type="file"
+                                ref={fileInputRef}
+                                className="hidden"
+                                accept="image/*"
+                                multiple
+                                onChange={handleFileSelect}
+                            />
+
+                            {/* Text Input */}
+                            <textarea
+                                className="flex-1 px-4 py-3 rounded-xl border border-gray-200 focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none transition-all bg-gray-50 text-brand-black resize-none min-h-[46px] max-h-[200px]"
+                                placeholder="Instructions for the builder... (Ctrl+Enter to send)"
                                 value={chatInput}
                                 onChange={(e) => setChatInput(e.target.value)}
+                                onPaste={handlePaste}
+                                onKeyDown={handleKeyDown}
+                                rows={1}
+                                style={{ height: 'auto', minHeight: '46px' }}
+                                onInput={(e) => {
+                                    e.currentTarget.style.height = 'auto';
+                                    e.currentTarget.style.height = e.currentTarget.scrollHeight + 'px';
+                                }}
                             />
-                            <Button type="submit" variant="primary">
+
+                            <Button type="submit" variant="primary" className="h-[46px]">
                                 Send
                             </Button>
                         </form>
