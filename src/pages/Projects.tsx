@@ -127,8 +127,10 @@ export default function Projects() {
 
 **1. PROJECT IDENTITY**
 *   **APP_ID:** \`${appId}\`
-*   **App Name:** ${selectedClient.companyName} ${appName || appType}
-*   **Purpose:** Custom ${appName || appType} for ${selectedClient.companyName}.
+*   **Client (Owner):** ${selectedClient.companyName}
+*   **App Name:** ${appName ? appName : appType}
+*   **System Blueprint (Type):** ${appType}
+*   **Purpose:** Custom ${appType} built for ${selectedClient.companyName}.
 
 **2. CORPORATE VISUAL IDENTITY (Exact Brand Hex Codes)**
 *   **Design Style:** Custom Brand Theme.
