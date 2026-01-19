@@ -28,8 +28,7 @@ export default function Sidebar({ children }: SidebarProps) {
                     </div>
 
                     <div>
-                        <p className="text-xs text-gray-500">2H Websolutions</p>
-                        <p className="text-xs text-gray-600">v1.0.0</p>
+                        <p className="text-xs text-brand-lime font-mono font-bold">2H Websolutions v1.1 (AI Active)</p>
                     </div>
                 </div>
             </div>
