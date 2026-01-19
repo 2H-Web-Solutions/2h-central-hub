@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, addDoc, setDoc, deleteDoc, doc, onSnapshot, serverTimestamp, query, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, setDoc, deleteDoc, doc, onSnapshot, serverTimestamp, query, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import Button from '../components/Button';
 import DashboardShell from '../components/DashboardShell';
