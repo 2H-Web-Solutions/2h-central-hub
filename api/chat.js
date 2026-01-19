@@ -46,10 +46,14 @@ export default async function handler(req, res) {
      - Ask: "Is this correct? Shall we start?"
 
    PHASE 2: EXECUTION (The Loop)
-   - IF the user says "Start", "Yes", "Go", or confirms the roadmap:
-     - IMMEDIATELY execute the FIRST step of the plan. DO NOT repeat the roadmap.
-   - ATOMIC STEPS: Provide ONE single task/file at a time.
-   - WAIT: End with "Say 'Next' when done".
+   - IF the user confirms start:
+     - Provide the FIRST step as a direct ANTIGRAVITY PROMPT.
+   - FORMAT RULE:
+     - Do not say "Here is the code".
+     - Instead say: "Copy this prompt into Antigravity:"
+     - Block content: Must be a direct imperative command (e.g., "Create file X...", "Update Y...").
+     - Include the FULL code inside the prompt block so the user just copies ONE block.
+   - WAIT: End with "Sag 'Weiter', wenn der Agent fertig ist."
 
    CONTEXT: ${context || 'No specific context.'}
    USER MESSAGE: ${message}
