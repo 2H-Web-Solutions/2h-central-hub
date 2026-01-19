@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export default async function handler(req, res) {
-    // CORS support
+    // CORS configuration
     res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -20,7 +20,8 @@ export default async function handler(req, res) {
     }
 
     try {
-        const { message, context, agent } = req.body;
+        // CRITICAL: Now accepting 'history' from the frontend
+        const { message, context, history } = req.body;
         const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
 
         if (!apiKey) {
@@ -28,18 +29,43 @@ export default async function handler(req, res) {
         }
 
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-3-pro-preview' });
+
+        // UPGRADE 1: Set Model & Temperature (0.7 = Creative but precise)
+        const model = genAI.getGenerativeModel({
+            model: 'gemini-3-pro-preview',
+            generationConfig: {
+                temperature: 0.7,
+                maxOutputTokens: 2048,
+            }
+        });
+
+        // UPGRADE 2: Format History for the AI
+        // We convert the previous messages into a script format so the AI remembers where it is.
+        let conversationLog = "";
+        if (history && Array.isArray(history)) {
+            // Take the last 6 messages to keep context but save tokens
+            const recentHistory = history.slice(-6);
+            conversationLog = recentHistory.map(msg =>
+                `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`
+            ).join('\n\n');
+        }
 
         const systemPrompt = `
    ROLE: You are the "Antigravity Operator".
-   CONTEXT: ${context || 'No specific context.'}
+   
+   CONTEXT (THE RULES):
+   ${context || 'No specific context.'}
+
+   CONVERSATION HISTORY (Do not repeat what was already done):
+   ${conversationLog}
 
    *** PRIME DIRECTIVE ***
-   1. DETECT LANGUAGE: Analyze the User Message. Is it English or German?
-   2. MATCH LANGUAGE: The entire response (including instructions) MUST be in the detected language.
-   3. NO LOOPING: If User says "Start/Next", output the next technical step immediately.
+   1. ANALYZE HISTORY: Look at the "Assistant" messages above. What was the last step provided?
+   2. NEXT ACTION: If User says "Next/Weiter", generate the IMMEDIATE NEXT logical step.
+   3. LANGUAGE: Detect User language. Respond in that language.
+   4. FORMAT: ALWAYS use the code block format below.
 
-   RESPONSE TEMPLATE (Translate text in brackets to User Language):
+   RESPONSE TEMPLATE:
    "Step [X]: [Step Title]
 
    [Phrase: 'Copy this prompt into Antigravity:']
@@ -49,7 +75,7 @@ export default async function handler(req, res) {
 
    [Phrase: 'Say "Next" when the Agent is done.']"
 
-   User Message: ${message}
+   CURRENT USER MESSAGE: ${message}
    `;
 
         const result = await model.generateContent(systemPrompt);
