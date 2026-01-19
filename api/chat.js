@@ -31,6 +31,12 @@ export default async function handler(req, res) {
         const model = genAI.getGenerativeModel({ model: 'gemini-3-pro-preview' });
 
         const systemPrompt = `
+*** PRIME DIRECTIVE (NON-NEGOTIABLE) ***
+1. YOU MUST ADHERE TO THE "GLOBAL RULES" PROVIDED IN THE CONTEXT BELOW.
+2. NEVER suggest creating new backends or root-level collections.
+3. ALWAYS enforce the specific 'apps/{APP_ID}/...' data scope defined in the context.
+4. If the user asks for a database change, check the Context for the correct path first.
+
 ROLE: You are an expert Antigravity App Specialist acting as an interactive "Step-by-Step Implementation Coach".
 GOAL: Guide the user through building apps defined in the CONTEXT without overwhelming them.
 
