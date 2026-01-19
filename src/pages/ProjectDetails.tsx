@@ -156,12 +156,7 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
 
         const currentInput = chatInput;
         setChatInput('');
-        setLoading(true); // Re-using loading state or we should add a specific one? The user asked for "Thinking..." state.
-        // Actually, 'loading' state is for the *page*. I should probably add a separate state `isThinking`.
-        // But for now, let's just use a local toast or similar if I don't want to refactor everything?
-        // No, the user said "UI: Ensure a 'Thinking...' state is shown". 
-        // I will add setIsThinking state in a separate edit or assume I can add it here if I modify the whole component.
-        // For this edit, I will focus on the Logic replacement. I'll add the state variable in a separate edit to be safe.
+        setIsThinking(true);
 
         try {
             // 1. Write User Message to Firestore (Instant)
@@ -171,16 +166,26 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                 timestamp: serverTimestamp()
             });
 
-            // 2. Call Serverless API (Turbo Mode)
+            // 2. Call API
             const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     message: currentInput,
-                    context: project?.memory || "",
-                    agent: 'Builder'
+                    context: project?.memory || "You are a helpful assistant.",
+                    agent: "Builder"
                 })
             });
+
+            // Check if response is JSON (Vite returns HTML on 404, which causes crash)
+            const contentType = response.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+                throw new Error("API not available (Localhost? Deploy to Vercel to test AI).");
+            }
+
+            if (!response.ok) {
+                throw new Error("API Request failed");
+            }
 
             const data = await response.json();
 
@@ -196,9 +201,9 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                 toast.error("AI failed to respond");
             }
 
-        } catch (error) {
-            console.error("Error sending message:", error);
-            toast.error("Failed to send message");
+        } catch (error: any) {
+            console.error("Chat Error:", error);
+            toast.error(error.message || "Failed to connect to AI");
         } finally {
             setIsThinking(false);
         }
