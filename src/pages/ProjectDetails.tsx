@@ -239,6 +239,7 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                     message: currentInput + (currentAttachments.length > 0 ? `\n[With ${currentAttachments.length} images]` : ''),
                     context: project?.memory || "You are a helpful assistant.",
                     agent: "Builder",
+                    history: messages.map(m => ({ role: m.role, content: m.content })),
                     // NOTE: Real multimodal support would require sending the Base64 in a specific format to the API. 
                     // For now, we assume text-based context or that the API ignores images if not supported.
                     // If you want actual Vision capabilities, you'd insert the image data here.
