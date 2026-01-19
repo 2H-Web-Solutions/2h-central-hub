@@ -37,27 +37,34 @@ interface Client {
     fontBody?: string;
 }
 
-const GENERAL_RULES = `
-## 3. INHERITED GENERAL RULES (DO NOT MODIFY)
-1. CORE ARCHITECTURE (The Single-Backend Law)
-Backend: NEVER create a new backend. Use the existing Firebase Project.
-Auth: Use Firebase Authentication. All data access depends on request.auth != null.
-Scoping: You will be assigned a unique APP_ID. ALL database paths MUST start with: apps/{APP_ID}/...
-NEVER read/write to the root or other app scopes.
+const GLOBAL_RULES = `
+*** 2H WEBSOLUTIONS ECOSYSTEM & RULES ***
 
-2. DATA SCHEMA STANDARDS
-A. TASKS (apps/{APP_ID}/tasks/{taskId}): { title, status, priority, due_date, deep_link }
-B. AI MEMORY (apps/{APP_ID}/memory/{docId}): { session_id, role, content, tags }
-C. n8n TRIGGERS (apps/{APP_ID}/actions/{actionId}): { action_type, payload, status, result }
+1. OUR WORLD (THE STACK)
+   - IDE/Builder: Google Antigravity (Agent-first coding).
+   - Hosting/Edge: Vercel (Serverless Functions used for AI/API).
+   - Backend/DB: Firebase (Firestore, Auth, Storage).
+   - Automation: n8n (Handles complex logic & third-party integrations).
+   - Code: React + Tailwind + TypeScript.
 
-3. SECURITY
-NO API KEYS IN CODE. Use .env for public keys only. Use 'actions' collection for sensitive ops.
+2. CORE ARCHITECTURE (SINGLE BACKEND)
+   - NEVER create a new Firebase project. Use the provided config.
+   - SCOPE: All DB writes must go to 'apps/{APP_ID}/...'.
+   - AUTH: Use Firebase Auth. No custom user databases.
 
-4. TECH STACK
-React (Vite) + Typescript. Tailwind CSS ONLY. Lucide Icons.
+3. SECURITY & API KEYS (STRICT)
+   - CLIENT-SIDE: Public keys (like Firebase Config) go into '.env'.
+   - SERVER-SIDE (Secrets): Keys like 'GOOGLE_GEMINI_API_KEY' MUST be set in Vercel Environment Variables.
+   - ACCESS: In code, access secrets via 'process.env.KEY_NAME' (only works in /api/ functions).
+   - RULE: Never hardcode an API Key in a file committed to GitHub.
 
-5. ERROR HANDLING
-Log runtime errors to apps/{APP_ID}/system_logs/. Show Toast Notifications.
+4. EXTERNAL CONNECTIONS
+   - Simple AI: Use Vercel Serverless Functions (/api/chat).
+   - Complex Ops: Write a document to 'apps/{APP_ID}/actions/'. n8n will trigger, execute, and write back the result.
+
+5. CODING STANDARD
+   - UI: Tailwind CSS only. Use 'lucide-react' for icons.
+   - ERROR HANDLING: Log errors to console AND 'apps/{APP_ID}/system_logs'.
 `.trim();
 
 export default function Projects() {
@@ -173,7 +180,7 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
     const handleCreateProject = async () => {
         if (!selectedClient) return;
 
-        const fullSystemContext = generatedPrompt + "\n\n" + GENERAL_RULES;
+        const fullSystemContext = generatedPrompt + "\n\n" + GLOBAL_RULES;
 
         try {
             await addDoc(collection(db, 'apps', '2h_hub_v1', 'projects'), {
