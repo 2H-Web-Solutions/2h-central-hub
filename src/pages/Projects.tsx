@@ -79,6 +79,7 @@ export default function Projects() {
 
     // Form State
     const [selectedClientId, setSelectedClientId] = useState('');
+    const [appName, setAppName] = useState('');
     const [appType, setAppType] = useState('Central Hub');
     const [version, setVersion] = useState('v1');
     const [generatedPrompt, setGeneratedPrompt] = useState('');
@@ -94,7 +95,9 @@ export default function Projects() {
     // Computed
     const selectedClient = clients.find(c => c.id === selectedClientId);
     const appId = selectedClient
-        ? `${selectedClient.companyName.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${appType.toLowerCase().replace(/ /g, '_')}_${version}`
+        ? (appName
+            ? `${selectedClient.companyName.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${appName.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${version}`
+            : `${selectedClient.companyName.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${appType.toLowerCase().replace(/ /g, '_')}_${version}`)
         : '';
 
     // Subscribe to Projects
@@ -120,12 +123,12 @@ export default function Projects() {
     useEffect(() => {
         if (selectedClient && appId) {
             const prompt = `
-### 📍 WORKSPACE CONTEXT: ${selectedClient.companyName.toUpperCase()} - ${appType.toUpperCase()}
+### 📍 WORKSPACE CONTEXT: ${selectedClient.companyName.toUpperCase()} - ${(appName || appType).toUpperCase()}
 
 **1. PROJECT IDENTITY**
 *   **APP_ID:** \`${appId}\`
-*   **App Name:** ${selectedClient.companyName} ${appType}
-*   **Purpose:** Custom ${appType} for ${selectedClient.companyName}.
+*   **App Name:** ${selectedClient.companyName} ${appName || appType}
+*   **Purpose:** Custom ${appName || appType} for ${selectedClient.companyName}.
 
 **2. CORPORATE VISUAL IDENTITY (Exact Brand Hex Codes)**
 *   **Design Style:** Custom Brand Theme.
@@ -163,10 +166,11 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
         } else {
             setGeneratedPrompt('');
         }
-    }, [selectedClient, appId, appType, apiKey, authDomain, projectId, storageBucket, messagingSenderId, fbAppId]);
+    }, [selectedClient, appId, appType, appName, apiKey, authDomain, projectId, storageBucket, messagingSenderId, fbAppId]);
 
     const resetForm = () => {
         setSelectedClientId('');
+        setAppName('');
         setAppType('Central Hub');
         setVersion('v1');
         setApiKey('');
@@ -188,6 +192,7 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
                 clientId: selectedClient.id,
                 clientName: selectedClient.companyName,
                 type: appType,
+                name: appName || appType,
                 createdAt: serverTimestamp(),
                 memory: fullSystemContext,
                 firebaseConfig: {
@@ -292,6 +297,16 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
                                                 <option key={c.id} value={c.id}>{c.companyName}</option>
                                             ))}
                                         </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-brand-text-muted mb-1">App Name (Specific)</label>
+                                        <input
+                                            type="text"
+                                            className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none transition-all bg-gray-50 text-brand-black"
+                                            placeholder="e.g. Marketing Dashboard 2026"
+                                            value={appName}
+                                            onChange={(e) => setAppName(e.target.value)}
+                                        />
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
