@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { collection, setDoc, deleteDoc, doc, onSnapshot, serverTimestamp, query, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, setDoc, deleteDoc, updateDoc, doc, addDoc, onSnapshot, serverTimestamp, query, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import Button from '../components/Button';
 import DashboardShell from '../components/DashboardShell';
 import SidebarNav from '../components/SidebarNav';
 import SecureDeleteModal from '../components/SecureDeleteModal';
-import { Trash2, Folder, AppWindow, ChevronRight, Home, Layout } from 'lucide-react';
+import { Trash2, Folder, AppWindow, ChevronRight, Home, Layout, FolderInput, Pencil, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface Project {
@@ -13,6 +13,7 @@ interface Project {
     appId: string;
     clientId: string;
     clientName: string;
+    folderId?: string | null; // NEW: Subfolder Support
     type: string;
     name: string;
     repoUrl?: string;
@@ -36,6 +37,13 @@ interface Client {
     surfaceColor?: string;
     fontHeading?: string;
     fontBody?: string;
+}
+
+interface Folder {
+    id: string;
+    name: string;
+    clientId: string;
+    createdAt?: Timestamp;
 }
 
 const GLOBAL_RULES = `
