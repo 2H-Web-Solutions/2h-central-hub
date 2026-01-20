@@ -35,7 +35,7 @@ export default async function handler(req, res) {
             model: 'gemini-3-pro-preview',
             generationConfig: {
                 temperature: 0.7,
-                maxOutputTokens: 10000,
+                maxOutputTokens: 8192, // MAXIMIZED to prevent cut-offs
             }
         });
 
