@@ -49,32 +49,40 @@ interface Folder {
 const GLOBAL_RULES = `
 *** 2H WEBSOLUTIONS ECOSYSTEM & RULES ***
 
-1. OUR WORLD (THE STACK)
-   - IDE/Builder: Google Antigravity (Agent-first coding).
-   - Hosting/Edge: Vercel (Serverless Functions used for AI/API).
-   - Backend/DB: Firebase (Firestore, Auth, Storage).
-   - Automation: n8n (Handles complex logic & third-party integrations).
-   - Code: React + Tailwind + TypeScript.
+1. TECH STACK (NON-NEGOTIABLE)
+   - Frontend: React + Vite + TypeScript + Tailwind CSS.
+   - Hosting: Vercel (linked via GitHub).
+   - Backend: Firebase (Firestore, Auth).
+   - Automation: n8n (via Webhooks).
 
-2. CORE ARCHITECTURE (SINGLE BACKEND)
-   - NEVER create a new Firebase project. Use the provided config.
-   - SCOPE: All DB writes must go to 'apps/{APP_ID}/...'.
-   - AUTH: Use Firebase Auth. No custom user databases.
+2. DATA ARCHITECTURE (SINGLE BACKEND LAW)
+   - Scope: ALL data must be stored under 'apps/{APP_ID}/...'.
+   - Root Access: NEVER write to the root of Firestore.
+   - Auth: Use Firebase Client SDK (Anonymous or User).
+   - Security Rule Target: "match /apps/{appId}/{document=**} { allow read, write: if request.auth != null; }"
 
-3. SECURITY & API KEYS (STRICT)
-   - CLIENT-SIDE: Public keys (like Firebase Config) go into '.env'.
-   - SERVER-SIDE (Secrets): Keys like 'GOOGLE_GEMINI_API_KEY' MUST be set in Vercel Environment Variables.
-   - ACCESS: In code, access secrets via 'process.env.KEY_NAME' (only works in /api/ functions).
-   - RULE: Never hardcode an API Key in a file committed to GitHub.
+3. DEPLOYMENT WORKFLOW (ANTIGRAVITY -> GITHUB -> VERCEL)
+   - Step 1: Initialize Git in Antigravity.
+   - Step 2: Push to GitHub ('git push origin main').
+   - Step 3: Connect Vercel to the GitHub Repo.
+   - Step 4: Add Environment Variables in Vercel Settings (NOT in code).
+   - Updates: To update the live app, simply commit and push to main.
 
-4. EXTERNAL CONNECTIONS
-   - Simple AI: Use Vercel Serverless Functions (/api/chat).
-   - Complex Ops: Write a document to 'apps/{APP_ID}/actions/'. n8n will trigger, execute, and write back the result.
+4. N8N INTEGRATION GUIDE
+   - Auth: Use "Google Cloud Firestore" node with "Google OAuth2 (JWT)".
+   - Credentials: Create a "Firebase Service Account" -> Generate JSON Key -> Paste into n8n Credential (Service Account Email + Private Key).
+   - Operation: n8n writes result data to 'apps/{APP_ID}/actions/{actionId}' or specific report collections.
 
-5. CODING STANDARD
-   - UI: Tailwind CSS only. Use 'lucide-react' for icons.
-   - ERROR HANDLING: Log errors to console AND 'apps/{APP_ID}/system_logs'.
-`.trim();
+5. SECURITY PROTOCOLS
+   - Client-Side: NO Admin SDK, NO Private Keys. Only use 'firebaseConfig'.
+   - Server-Side (n8n/Vercel): Use Service Accounts/API Keys stored in Env Vars.
+   - Error Handling: Fail gracefully. If n8n doesn't respond, show UI feedback.
+
+6. UI/UX STANDARDS
+   - Font: Headers='Federo', Body='Barlow'.
+   - Colors: Strict usage of Brand Colors defined in Tailwind config.
+   - Layout: Sticky Sidebar (Dark), Scrollable Content (Light).
+`;
 
 export default function Projects() {
     const navigate = useNavigate();
