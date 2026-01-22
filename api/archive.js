@@ -10,7 +10,7 @@ export default async function handler(req, res) {
         const { sessionId, currentContext } = req.body;
 
         // Call n8n Webhook (Server-to-Server)
-        const n8nResponse = await fetch('https://up-seo-2025.app.n8n.cloud/webhook-test/archive-session', {
+        const n8nResponse = await fetch('https://up-seo-2025.app.n8n.cloud/webhook/archive-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ sessionId, currentContext })
