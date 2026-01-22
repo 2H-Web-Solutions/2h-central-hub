@@ -303,7 +303,7 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    sessionId: project?.appId || projectId,
+                    sessionId: project?.id || projectId,
                     currentContext: project?.memory || ""
                 })
             });
