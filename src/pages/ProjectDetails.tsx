@@ -299,7 +299,7 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
 
         const toastId = toast.loading("Archiving session knowledge...");
         try {
-            await fetch('https://up-seo-2025.app.n8n.cloud/webhook-test/archive-session', {
+            await fetch('/api/archive', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
