@@ -173,22 +173,28 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
-            const file = e.target.files[0];
-            const base64 = await convertFileToBase64(file);
-            setAttachments(prev => [...prev, base64]);
+            const files = Array.from(e.target.files);
+            const base64s = await Promise.all(files.map(file => convertFileToBase64(file)));
+            setAttachments(prev => [...prev, ...base64s]);
         }
     };
 
     const handlePaste = async (e: React.ClipboardEvent) => {
         const items = e.clipboardData.items;
+        const promises: Promise<string>[] = [];
+
         for (let i = 0; i < items.length; i++) {
             if (items[i].type.indexOf('image') !== -1) {
                 const file = items[i].getAsFile();
                 if (file) {
-                    const base64 = await convertFileToBase64(file);
-                    setAttachments(prev => [...prev, base64]);
+                    promises.push(convertFileToBase64(file));
                 }
             }
+        }
+
+        if (promises.length > 0) {
+            const base64s = await Promise.all(promises);
+            setAttachments(prev => [...prev, ...base64s]);
         }
     };
 
@@ -196,10 +202,10 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
         e.preventDefault();
         e.stopPropagation();
         if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-            const file = e.dataTransfer.files[0];
-            if (file.type.startsWith('image/')) {
-                const base64 = await convertFileToBase64(file);
-                setAttachments(prev => [...prev, base64]);
+            const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+            if (files.length > 0) {
+                const base64s = await Promise.all(files.map(file => convertFileToBase64(file)));
+                setAttachments(prev => [...prev, ...base64s]);
             }
         }
     };
@@ -576,7 +582,7 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                     <div className="p-4 bg-white border-t border-gray-100">
                         {/* Attachment Previews */}
                         {attachments.length > 0 && (
-                            <div className="flex gap-2 mb-3 overflow-x-auto pb-2">
+                            <div className="flex flex-wrap gap-2 mb-3 pb-2">
                                 {attachments.map((src, index) => (
                                     <div key={index} className="relative group shrink-0">
                                         <img src={src} className="h-16 w-16 object-cover rounded-lg border border-gray-200" alt="preview" />
