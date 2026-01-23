@@ -120,12 +120,7 @@ export default function Projects() {
     const [generatedPrompt, setGeneratedPrompt] = useState('');
 
     // Firebase Config State
-    const [apiKey, setApiKey] = useState('');
-    const [authDomain, setAuthDomain] = useState('');
-    const [projectId, setProjectId] = useState('');
-    const [storageBucket, setStorageBucket] = useState('');
-    const [messagingSenderId, setMessagingSenderId] = useState('');
-    const [fbAppId, setFbAppId] = useState('');
+
 
     // Computed
     const selectedClient = clients.find(c => c.id === selectedClientId);
@@ -201,31 +196,26 @@ export default function Projects() {
 ### 6. INITIAL .ENV CONTENT
 \`\`\`env
 # Firebase Configuration
-VITE_FIREBASE_API_KEY=${apiKey || 'Pending'}
-VITE_FIREBASE_AUTH_DOMAIN=${authDomain || 'Pending'}
-VITE_FIREBASE_PROJECT_ID=${projectId || 'Pending'}
-VITE_FIREBASE_STORAGE_BUCKET=${storageBucket || 'Pending'}
-VITE_FIREBASE_MESSAGING_SENDER_ID=${messagingSenderId || 'Pending'}
-VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
+VITE_FIREBASE_API_KEY=${import.meta.env.VITE_FIREBASE_API_KEY || 'Pending'}
+VITE_FIREBASE_AUTH_DOMAIN=${import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'Pending'}
+VITE_FIREBASE_PROJECT_ID=${import.meta.env.VITE_FIREBASE_PROJECT_ID || 'Pending'}
+VITE_FIREBASE_STORAGE_BUCKET=${import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'Pending'}
+VITE_FIREBASE_MESSAGING_SENDER_ID=${import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || 'Pending'}
+VITE_FIREBASE_APP_ID=${import.meta.env.VITE_FIREBASE_APP_ID || 'Pending'}
 \`\`\`
             `.trim();
             setGeneratedPrompt(prompt);
         } else {
             setGeneratedPrompt('');
         }
-    }, [selectedClient, appId, appType, appName, apiKey, authDomain, projectId, storageBucket, messagingSenderId, fbAppId]);
+    }, [selectedClient, appId, appType, appName]);
 
     const resetForm = () => {
         setSelectedClientId('');
         setAppName('');
         setAppType('Central Hub');
         setVersion('v1');
-        setApiKey('');
-        setAuthDomain('');
-        setProjectId('');
-        setStorageBucket('');
-        setMessagingSenderId('');
-        setFbAppId('');
+
     };
 
     const handleOpenWizard = () => {
@@ -251,12 +241,12 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
                 createdAt: serverTimestamp(),
                 memory: fullSystemContext,
                 firebaseConfig: {
-                    apiKey,
-                    authDomain,
-                    projectId,
-                    storageBucket,
-                    messagingSenderId,
-                    appId: fbAppId
+                    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+                    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+                    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+                    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+                    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+                    appId: import.meta.env.VITE_FIREBASE_APP_ID
                 }
             });
             setIsWizardOpen(false);
@@ -635,69 +625,7 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
                                     </div>
                                 </div>
 
-                                {/* Section 2: Firebase Config */}
-                                <div className="space-y-4">
-                                    <h4 className="text-sm font-bold text-gray-900 border-b pb-2">2. Firebase Configuration</h4>
 
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-500 mb-1">apiKey</label>
-                                        <input
-                                            type="text"
-                                            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none bg-gray-50"
-                                            value={apiKey}
-                                            onChange={(e) => setApiKey(e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-500 mb-1">authDomain</label>
-                                            <input
-                                                type="text"
-                                                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none bg-gray-50"
-                                                value={authDomain}
-                                                onChange={(e) => setAuthDomain(e.target.value)}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-500 mb-1">projectId</label>
-                                            <input
-                                                type="text"
-                                                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none bg-gray-50"
-                                                value={projectId}
-                                                onChange={(e) => setProjectId(e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-500 mb-1">storageBucket</label>
-                                            <input
-                                                type="text"
-                                                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none bg-gray-50"
-                                                value={storageBucket}
-                                                onChange={(e) => setStorageBucket(e.target.value)}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-500 mb-1">messagingSenderId</label>
-                                            <input
-                                                type="text"
-                                                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none bg-gray-50"
-                                                value={messagingSenderId}
-                                                onChange={(e) => setMessagingSenderId(e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-500 mb-1">appId</label>
-                                        <input
-                                            type="text"
-                                            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none bg-gray-50"
-                                            value={fbAppId}
-                                            onChange={(e) => setFbAppId(e.target.value)}
-                                        />
-                                    </div>
-                                </div>
                             </div>
 
                             {/* Right: Magic Preview */}
