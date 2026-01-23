@@ -5,7 +5,7 @@ import { db } from '../lib/firebase';
 import DashboardShell from '../components/DashboardShell';
 import SidebarNav from '../components/SidebarNav';
 import Button from '../components/Button';
-import { Github, Globe, ExternalLink, MessageSquare, Trash2, Lock, Copy, Paperclip, X, Archive } from 'lucide-react';
+import { Github, Globe, ExternalLink, MessageSquare, Trash2, Lock, Copy, Paperclip, X, Archive, Map, Hammer, Bug } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Project {
@@ -24,6 +24,7 @@ interface Project {
         messagingSenderId?: string;
         appId?: string;
     };
+    agentMode?: 'STARTER' | 'BUILDER' | 'SOLVER';
 }
 
 interface ChatMessage {
@@ -57,6 +58,7 @@ export default function ProjectDetails() {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [chatInput, setChatInput] = useState('');
     const [isThinking, setIsThinking] = useState(false);
+    const [agentMode, setAgentMode] = useState<'STARTER' | 'BUILDER' | 'SOLVER'>('STARTER');
     const [attachments, setAttachments] = useState<string[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -85,6 +87,12 @@ export default function ProjectDetails() {
                         setFbAppId(data.firebaseConfig.appId || '');
                     }
                 }
+
+                // Sync Agent Mode from Project (Persistence)
+                if (data.agentMode) {
+                    setAgentMode(data.agentMode as 'STARTER' | 'BUILDER' | 'SOLVER');
+                }
+
                 setLoading(false);
             } else {
                 navigate('/projects');
@@ -126,6 +134,19 @@ export default function ProjectDetails() {
             await updateDoc(docRef, { [field]: value });
         } catch (error) {
             console.error(`Error updating ${field}:`, error);
+        }
+    };
+
+    const handleModeChange = async (newMode: 'STARTER' | 'BUILDER' | 'SOLVER') => {
+        setAgentMode(newMode);
+        toast.success(`Switched to ${newMode === 'STARTER' ? 'Architect' : newMode === 'BUILDER' ? 'Builder' : 'Fixer'} Mode`);
+
+        if (!projectId) return;
+        try {
+            const docRef = doc(db, 'apps', '2h_hub_v1', 'projects', projectId);
+            await updateDoc(docRef, { agentMode: newMode });
+        } catch (error) {
+            console.error("Error updating agent mode:", error);
         }
     };
 
@@ -245,6 +266,7 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                     message: currentInput + (currentAttachments.length > 0 ? `\n[With ${currentAttachments.length} images]` : ''),
                     context: project?.memory || "You are a helpful assistant.",
                     agent: "Builder",
+                    agentMode: agentMode,
                     history: messages.map(m => ({ role: m.role, content: m.content })),
                     // NOTE: Real multimodal support would require sending the Base64 in a specific format to the API. 
                     // For now, we assume text-based context or that the API ignores images if not supported.
@@ -312,6 +334,12 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
         } catch (error) {
             console.error("Archive failed:", error);
             toast.error("Archive failed.", { id: toastId });
+        } finally {
+            // Auto-transition to Builder Mode if currently in Starter
+            if (agentMode === 'STARTER') {
+                handleModeChange('BUILDER');
+                toast.success("Transitioning to Builder Mode for Feature Development", { icon: '🚀' });
+            }
         }
     };
 
@@ -511,28 +539,67 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                 >
                     {/* Chat Header */}
                     <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                        <div>
+                        <div className="flex flex-col">
                             <h3 className="font-bold text-brand-black flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-brand-lime"></div>
-                                Builder Assistant
+                                <div className={`w-2 h-2 rounded-full ${agentMode === 'STARTER' ? 'bg-green-500' :
+                                    agentMode === 'BUILDER' ? 'bg-blue-500' :
+                                        'bg-red-500'
+                                    }`}></div>
+                                {agentMode === 'STARTER' ? 'Architect Assistant' :
+                                    agentMode === 'BUILDER' ? 'Builder Assistant' :
+                                        'Fixer Assistant'}
                             </h3>
-                            <p className="text-xs text-brand-text-muted">Context Aware • Project Specific</p>
+                            <p className="text-xs text-brand-text-muted">
+                                {agentMode === 'STARTER' ? 'Planning & Setup' :
+                                    agentMode === 'BUILDER' ? 'Features & Logic' :
+                                        'Debugger & Fixes'}
+                            </p>
                         </div>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={handleSmartArchive}
-                                className="text-xs font-medium text-gray-500 hover:text-brand-lime bg-white border border-gray-200 px-3 py-1.5 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
-                                title="Sync memory to n8n & Clear"
-                            >
-                                <Archive size={14} /> Smart Archive
-                            </button>
-                            <button
-                                onClick={handleWipeChat}
-                                className="text-xs font-medium text-red-400 hover:text-red-600 bg-white border border-red-100 hover:border-red-200 px-3 py-1.5 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
-                                title="Delete messages without saving"
-                            >
-                                <Trash2 size={14} /> Wipe Chat
-                            </button>
+                        <div className="flex items-center gap-4">
+                            {/* Mode Switcher */}
+                            <div className="flex bg-gray-100 p-1 rounded-lg">
+                                <button
+                                    onClick={() => handleModeChange('STARTER')}
+                                    className={`p-1.5 rounded-md transition-all ${agentMode === 'STARTER' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                                    title="Starter (Architect)"
+                                >
+                                    <Map size={16} />
+                                </button>
+                                <button
+                                    onClick={() => handleModeChange('BUILDER')}
+                                    className={`p-1.5 rounded-md transition-all ${agentMode === 'BUILDER' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                                    title="Builder (Features)"
+                                >
+                                    <Hammer size={16} />
+                                </button>
+                                <button
+                                    onClick={() => handleModeChange('SOLVER')}
+                                    className={`p-1.5 rounded-md transition-all ${agentMode === 'SOLVER' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                                    title="Solver (Debugger)"
+                                >
+                                    <Bug size={16} />
+                                </button>
+                            </div>
+
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={handleSmartArchive}
+                                    className={`text-xs font-medium bg-white border px-3 py-1.5 rounded-lg flex items-center gap-2 transition-colors shadow-sm ${agentMode === 'STARTER'
+                                            ? 'border-brand-lime text-brand-black ring-2 ring-brand-lime/20 animate-pulse'
+                                            : 'border-gray-200 text-gray-500 hover:text-brand-lime'
+                                        }`}
+                                    title="Sync memory to n8n & Clear"
+                                >
+                                    <Archive size={14} /> Smart Archive
+                                </button>
+                                <button
+                                    onClick={handleWipeChat}
+                                    className="text-xs font-medium text-red-400 hover:text-red-600 bg-white border border-red-100 hover:border-red-200 px-3 py-1.5 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                                    title="Delete messages without saving"
+                                >
+                                    <Trash2 size={14} /> Wipe Chat
+                                </button>
+                            </div>
                         </div>
                     </div>
 
