@@ -99,6 +99,15 @@ const GLOBAL_RULES = `
       C. MAIN CONTENT (Scrollable, Theme: Light/#F0F0F3)
          - Padding: p-6 or p-8.
          - Cards: White background, slight shadow, rounded-lg.
+         - Cards: White background, slight shadow, rounded-lg.
+`;
+
+const TASK_PROTOCOL = `
+*** MODULE: GLOBAL TASK SYNC ***
+You MUST implement a Task Management System compatible with the Central Hub.
+1. DATA PATH: 'apps/{APP_ID}/tasks/{taskId}'
+2. SCHEMA: { title (string), status ('open'|'in_progress'|'done'), priority ('low'|'medium'|'high'), dueDate (timestamp) }
+3. UI: Create a 'Tasks' page in the Sidebar.
 `;
 
 export default function Projects() {
@@ -134,6 +143,7 @@ export default function Projects() {
     const [appName, setAppName] = useState('');
     const [appType, setAppType] = useState('Central Hub');
     const [version, setVersion] = useState('v1');
+    const [includeTasks, setIncludeTasks] = useState(true);
     const [generatedPrompt, setGeneratedPrompt] = useState('');
 
     // Firebase Config State
@@ -236,6 +246,7 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
         setAppName('');
         setAppType('Central Hub');
         setVersion('v1');
+        setIncludeTasks(true);
 
         setFbApiKey('');
         setFbAuthDomain('');
@@ -255,7 +266,7 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
     const handleCreateProject = async () => {
         if (!selectedClient) return;
 
-        const fullSystemContext = generatedPrompt + "\n\n" + GLOBAL_RULES;
+        const fullSystemContext = GLOBAL_RULES + (includeTasks ? "\n\n" + TASK_PROTOCOL : "") + "\n\n" + generatedPrompt;
 
         try {
             await setDoc(doc(db, 'apps', '2h_hub_v1', 'projects', appId), {
@@ -265,6 +276,7 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
                 folderId: viewFolder?.id || null, // ASSIGN TO FOLDER
                 type: appType,
                 name: appName || appType,
+                includeTasks: includeTasks,
                 createdAt: serverTimestamp(),
                 memory: fullSystemContext,
                 firebaseConfig: {
@@ -648,6 +660,25 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
                                                 value={version}
                                                 onChange={(e) => setVersion(e.target.value)}
                                             />
+                                        </div>
+                                    </div>
+
+                                    {/* Link: Global Task Sync */}
+                                    <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                                        <input
+                                            type="checkbox"
+                                            id="includeTasks"
+                                            className="mt-1 w-4 h-4 text-brand-lime border-gray-300 rounded focus:ring-brand-lime"
+                                            checked={includeTasks}
+                                            onChange={(e) => setIncludeTasks(e.target.checked)}
+                                        />
+                                        <div>
+                                            <label htmlFor="includeTasks" className="block text-sm font-medium text-gray-900">
+                                                🔌 Include Global Task Sync
+                                            </label>
+                                            <p className="text-xs text-gray-500">
+                                                Enables this app to send tasks to the Central Hub.
+                                            </p>
                                         </div>
                                     </div>
                                 </div>
