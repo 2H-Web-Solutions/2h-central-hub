@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
-import { collection, collectionGroup, addDoc, updateDoc, onSnapshot, serverTimestamp, query, orderBy, Timestamp, DocumentReference } from 'firebase/firestore';
+import { useState, useEffect, useMemo } from 'react';
+import { collection, collectionGroup, addDoc, updateDoc, onSnapshot, serverTimestamp, query, orderBy, Timestamp, DocumentReference, deleteDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import Button from '../components/Button';
 import DashboardShell from '../components/DashboardShell';
 import SidebarNav from '../components/SidebarNav';
+import { Search, Filter, Plus, Calendar, CheckCircle2, Clock, AlertCircle, Trash2, X, Save, ExternalLink } from 'lucide-react';
 
+// --- Types ---
 interface Task {
     id: string;
     ref: DocumentReference;
@@ -15,8 +17,15 @@ interface Task {
     dueDate: Date | null;
     createdAt?: Timestamp;
     sourceAppId: string;
+    description?: string; // Added description field
 }
 
+interface Client {
+    id: string;
+    companyName: string;
+}
+
+// --- Helpers ---
 const normalizeStatus = (status: string): 'todo' | 'in_progress' | 'done' => {
     const s = (status || '').toLowerCase();
     if (['open', 'pending', 'todo', 'new'].includes(s)) return 'todo';
@@ -25,245 +34,389 @@ const normalizeStatus = (status: string): 'todo' | 'in_progress' | 'done' => {
     return 'todo';
 };
 
+const formatAppId = (appId: string) => {
+    return (appId || 'Unknown')
+        .replace(/^2h_/, '')
+        .replace(/_v\d+$/, '')
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase())
+        .trim();
+};
+
+const getPriorityColor = (p: string) => {
+    switch (p) {
+        case 'high': return 'bg-red-100 text-red-700 border-red-200';
+        case 'medium': return 'bg-amber-100 text-amber-700 border-amber-200';
+        case 'low': return 'bg-blue-100 text-blue-700 border-blue-200';
+        default: return 'bg-gray-100 text-gray-700 border-gray-200';
+    }
+};
+
 const normalizeTask = (doc: any): Task => {
     const data = doc.data();
     return {
         id: doc.id,
         ref: doc.ref,
-        // Title Fallback Chain:
-        title: data.title || data.name || data.taskName || data.headline || "Untitled Task",
-        // Client/App Fallback:
+        // Intelligent Title Mapping
+        title: data.title || data.taskName || data.name || data.headline || data.description?.slice(0, 50) || data.text?.slice(0, 50) || "Untitled Task",
         assignedClient: data.assignedClient || data.clientName || data.client || "Unknown Client",
         status: normalizeStatus(data.status),
         priority: ['low', 'medium', 'high'].includes(data.priority) ? data.priority : 'medium',
         dueDate: data.dueDate?.toDate ? data.dueDate.toDate() : (data.due_date?.toDate ? data.due_date.toDate() : (data.dueDate ? new Date(data.dueDate) : null)),
         createdAt: data.createdAt,
-        sourceAppId: data.sourceApp || data.appName || doc.ref.parent.parent?.id || '2h_hub_v1'
+        // Intelligent App Source Extraction
+        sourceAppId: data.sourceApp || data.appName || doc.ref.parent.parent?.id || '2h_hub_v1',
+        description: data.description || data.text || ''
     };
-};
-
-interface Client {
-    id: string;
-    companyName: string;
-}
-
-
-const formatAppId = (appId: string) => {
-    return appId
-        .replace(/^2h_/, '')            // Remove prefix
-        .replace(/_v\d+$/, '')          // Remove version suffix
-        .replace(/_/g, ' ')             // Replace underscores with spaces
-        .replace(/\b\w/g, c => c.toUpperCase()); // Capitalize words
 };
 
 export default function Tasks() {
+    // --- State ---
     const [tasks, setTasks] = useState<Task[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
-    const [isModalOpen, setIsModalOpen] = useState(false);
     const [loading, setLoading] = useState(true);
+
+    // Filters
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedAppFilter, setSelectedAppFilter] = useState('All Apps');
+
+    // Modals & Editing
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [editingTask, setEditingTask] = useState<Task | null>(null); // If set, Details Modal is open
+
+    // Drag & Drop
     const [draggedTask, setDraggedTask] = useState<Task | null>(null);
 
-    // Form State
-    const [title, setTitle] = useState('');
-    const [assignedClient, setAssignedClient] = useState('');
-    const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
-    const [dueDate, setDueDate] = useState('');
+    // Form State (shared for Create/Edit)
+    const [formData, setFormData] = useState<{
+        title: string;
+        client: string;
+        priority: 'low' | 'medium' | 'high';
+        status: 'todo' | 'in_progress' | 'done';
+        dueDate: string;
+        description: string;
+    }>({
+        title: '', client: '', priority: 'medium', status: 'todo', dueDate: '', description: ''
+    });
 
-    // Subscribe to Tasks
+    // --- Effects ---
+
+    // 1. Fetch Tasks
     useEffect(() => {
-        const q = query(
-            collectionGroup(db, 'tasks'),
-            orderBy('createdAt', 'desc')
-        );
-
+        const q = query(collectionGroup(db, 'tasks'), orderBy('createdAt', 'desc'));
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const taskList: Task[] = snapshot.docs.map(doc => normalizeTask(doc));
+            const taskList = snapshot.docs.map(normalizeTask);
             setTasks(taskList);
             setLoading(false);
         });
-
         return () => unsubscribe();
     }, []);
 
-    // Drag & Drop Handlers
-    const handleDragStart = (task: Task) => {
-        setDraggedTask(task);
-    };
-
-    const handleDragOver = (e: React.DragEvent) => {
-        e.preventDefault();
-    };
-
-    const handleDrop = async (newStatus: 'todo' | 'in_progress' | 'done') => {
-        if (!draggedTask) return;
-        if (draggedTask.status === newStatus) return;
-
-        try {
-            // Optimistic Update (optional, but good for UX - here we rely on snapshot)
-            // Actual Firestore Update
-            await updateDoc(draggedTask.ref, { status: newStatus });
-        } catch (error) {
-            console.error("Error updating task status:", error);
-            alert("Failed to move task.");
-        }
-        setDraggedTask(null);
-    };
-
-    // Subscribe to Clients (for Dropdown)
+    // 2. Fetch Clients
     useEffect(() => {
         const q = query(collection(db, 'apps', '2h_hub_v1', 'clients'), orderBy('companyName'));
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const clientList: Client[] = snapshot.docs.map(doc => ({
-                id: doc.id,
-                companyName: doc.data().companyName
-            } as Client));
-            setClients(clientList);
+            setClients(snapshot.docs.map(doc => ({ id: doc.id, companyName: doc.data().companyName })));
         });
         return () => unsubscribe();
     }, []);
 
-    const handleAddTask = async (e: React.FormEvent) => {
+    // --- Derived State ---
+    const uniqueApps = useMemo(() => {
+        const apps = new Set(tasks.map(t => formatAppId(t.sourceAppId)));
+        return ['All Apps', ...Array.from(apps).sort()];
+    }, [tasks]);
+
+    const filteredTasks = useMemo(() => {
+        return tasks.filter(task => {
+            const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                task.assignedClient.toLowerCase().includes(searchQuery.toLowerCase());
+            const matchesApp = selectedAppFilter === 'All Apps' || formatAppId(task.sourceAppId) === selectedAppFilter;
+            return matchesSearch && matchesApp;
+        });
+    }, [tasks, searchQuery, selectedAppFilter]);
+
+    // --- Handlers ---
+
+    const openCreateModal = () => {
+        setFormData({ title: '', client: '', priority: 'medium', status: 'todo', dueDate: '', description: '' });
+        setIsCreateModalOpen(true);
+    };
+
+    const openEditModal = (task: Task) => {
+        setEditingTask(task);
+        setFormData({
+            title: task.title,
+            client: task.assignedClient,
+            priority: task.priority,
+            status: task.status,
+            dueDate: task.dueDate ? task.dueDate.toISOString().split('T')[0] : '',
+            description: task.description || ''
+        });
+    };
+
+    const handleCreateSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
             await addDoc(collection(db, 'apps', '2h_hub_v1', 'tasks'), {
-                title,
-                assignedClient,
-                priority,
-                status: 'todo', // Default status
-                dueDate,
+                title: formData.title,
+                assignedClient: formData.client,
+                priority: formData.priority,
+                status: 'todo',
+                dueDate: formData.dueDate,
+                description: formData.description,
                 createdAt: serverTimestamp()
             });
-            setIsModalOpen(false);
-            setTitle('');
-            setAssignedClient('');
-            setPriority('medium');
-            setDueDate('');
-        } catch (error) {
-            console.error("Error adding task: ", error);
-            alert("Failed to add task");
-        }
+            setIsCreateModalOpen(false);
+        } catch (err) { console.error(err); alert("Failed to create task"); }
     };
 
-    const TaskColumn = ({ title, status, items }: { title: string, status: 'todo' | 'in_progress' | 'done', items: Task[] }) => (
-        <div
-            className="flex flex-col h-full"
-            onDragOver={handleDragOver}
-            onDrop={() => handleDrop(status)}
-        >
-            <h3 className="text-lg font-serif font-bold text-brand-black mb-4 px-2">{title} <span className="text-sm text-gray-400 font-sans font-normal ml-2">({items.length})</span></h3>
-            <div className={`p-4 rounded-xl flex-1 space-y-3 min-h-[200px] transition-colors ${draggedTask ? 'bg-zinc-200/80 dashed-border' : 'bg-zinc-200/50'}`}>
-                {items.map(task => (
-                    <div
-                        key={task.id}
-                        draggable
-                        onDragStart={() => handleDragStart(task)}
-                        className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-all cursor-move active:cursor-grabbing"
-                    >
-                        <div className="flex justify-between items-start mb-2">
-                            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${task.priority === 'high' ? 'bg-red-100 text-red-600' :
-                                'bg-blue-100 text-blue-600'
-                                }`}>
-                                {task.priority}
-                            </span>
-                            {task.sourceAppId && task.sourceAppId !== '2h_hub_v1' && (
-                                <span className="text-[10px] font-medium bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                                    {formatAppId(task.sourceAppId)}
-                                </span>
-                            )}
+    const handleEditSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingTask) return;
+        try {
+            await updateDoc(editingTask.ref, {
+                title: formData.title,
+                assignedClient: formData.client,
+                priority: formData.priority,
+                status: formData.status,
+                dueDate: formData.dueDate, // In a real app, maybe convert back to Timestamp or Date
+                description: formData.description
+            });
+            setEditingTask(null);
+        } catch (err) { console.error(err); alert("Failed to update task"); }
+    };
 
-                            {task.dueDate && <span className="text-[10px] text-gray-400 ml-auto">{task.dueDate.toLocaleDateString()}</span>}
-                        </div>
-                        <h4 className="text-sm font-bold text-brand-black mb-1">{task.title}</h4>
-                        <p className="text-xs text-brand-text-muted">{task.assignedClient}</p>
-                    </div>
-                ))}
+    const handleDeleteTask = async () => {
+        if (!editingTask || !confirm("Are you sure you want to delete this task?")) return;
+        try {
+            await deleteDoc(editingTask.ref);
+            setEditingTask(null);
+        } catch (err) { console.error(err); alert("Failed to delete task"); }
+    };
+
+    // Drag & Drop
+    const handleDrop = async (newStatus: 'todo' | 'in_progress' | 'done') => {
+        if (!draggedTask || draggedTask.status === newStatus) return;
+        try {
+            await updateDoc(draggedTask.ref, { status: newStatus });
+        } catch (err) { console.error(err); }
+        setDraggedTask(null);
+    };
+
+    // --- Components ---
+
+    const TaskCard = ({ task }: { task: Task }) => (
+        <div
+            draggable
+            onDragStart={() => setDraggedTask(task)}
+            onClick={() => openEditModal(task)}
+            className="group bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-brand-lime/50 transition-all cursor-pointer active:scale-[0.98]"
+        >
+            <div className="flex justify-between items-start mb-2">
+                <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${getPriorityColor(task.priority)}`}>
+                    {task.priority}
+                </span>
+                {task.sourceAppId !== '2h_hub_v1' && (
+                    <span className="text-[10px] font-medium bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full border border-gray-200">
+                        {formatAppId(task.sourceAppId)}
+                    </span>
+                )}
+            </div>
+            <h4 className="font-bold text-base text-gray-900 mb-1 leading-tight group-hover:text-brand-lime transition-colors">
+                {task.title}
+            </h4>
+            <div className="flex justify-between items-center mt-3">
+                <span className="text-xs font-medium text-gray-500 bg-gray-50 px-2 py-1 rounded">
+                    {task.assignedClient}
+                </span>
+                {task.dueDate && (
+                    <span className={`text-xs flex items-center gap-1 ${task.dueDate < new Date() ? 'text-red-500 font-bold' : 'text-gray-400'}`}>
+                        <Calendar size={12} />
+                        {task.dueDate.toLocaleDateString()}
+                    </span>
+                )}
             </div>
         </div>
     );
 
+    const Column = ({ title, status, icon: Icon }: { title: string, status: 'todo' | 'in_progress' | 'done', icon: any }) => {
+        const items = filteredTasks.filter(t => t.status === status);
+        return (
+            <div
+                className="flex flex-col h-full min-w-[320px] w-full"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => handleDrop(status)}
+            >
+                <div className="flex items-center justify-between mb-4 px-1">
+                    <h3 className="font-serif font-bold text-lg text-gray-900 flex items-center gap-2">
+                        {Icon && <Icon size={20} className="text-brand-lime" />}
+                        {title}
+                    </h3>
+                    <span className="bg-gray-100 text-gray-600 text-xs font-bold px-2 py-1 rounded-full">
+                        {items.length}
+                    </span>
+                </div>
+                <div className={`flex-1 overflow-y-auto p-2 space-y-3 rounded-2xl transition-colors ${draggedTask ? 'bg-gray-50/50 dashed-border' : ''}`}>
+                    {items.map(task => <TaskCard key={task.id} task={task} />)}
+                    {items.length === 0 && (
+                        <div className="h-32 flex flex-col items-center justify-center text-gray-300 border-2 border-dashed border-gray-100 rounded-xl">
+                            <p className="text-sm font-medium">No Tasks</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
     return (
-        <DashboardShell
-            headerTitle="Global Tasks"
-            sidebarContent={<SidebarNav />}
-            headerActions={
-                <Button onClick={() => setIsModalOpen(true)}>New Task</Button>
-            }
-        >
-            {loading ? (
-                <p className="text-brand-text-muted">Loading tasks...</p>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full pb-8">
-                    <TaskColumn title="To Do" status="todo" items={tasks.filter(t => t.status === 'todo')} />
-                    <TaskColumn title="In Progress" status="in_progress" items={tasks.filter(t => t.status === 'in_progress')} />
-                    <TaskColumn title="Done" status="done" items={tasks.filter(t => t.status === 'done')} />
+        <DashboardShell headerTitle="Global Task Board" sidebarContent={<SidebarNav />}>
+            <div className="flex flex-col h-[calc(100vh-140px)]">
+
+                {/* Toolbar */}
+                <div className="bg-white border-b border-gray-100 p-4 flex flex-wrap gap-4 items-center justify-between shrink-0">
+                    <div className="flex items-center gap-4 flex-1 min-w-[200px]">
+                        <div className="relative flex-1 max-w-md">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                            <input
+                                type="text"
+                                placeholder="Search tasks or clients..."
+                                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-1 focus:ring-brand-lime focus:border-brand-lime outline-none transition-all"
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                            />
+                        </div>
+                        <div className="relative">
+                            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                            <select
+                                className="pl-10 pr-8 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:ring-brand-lime outline-none cursor-pointer hover:border-gray-300 appearance-none font-medium text-gray-700"
+                                value={selectedAppFilter}
+                                onChange={e => setSelectedAppFilter(e.target.value)}
+                            >
+                                {uniqueApps.map(app => <option key={app} value={app}>{app}</option>)}
+                            </select>
+                        </div>
+                    </div>
+                    <Button onClick={openCreateModal} className="shrink-0 flex items-center gap-2">
+                        <Plus size={18} /> New Task
+                    </Button>
+                </div>
+
+                {/* Kanban Board */}
+                {loading ? (
+                    <div className="flex-1 flex items-center justify-center text-gray-400">Loading global tasks...</div>
+                ) : (
+                    <div className="flex-1 overflow-x-auto overflow-y-hidden">
+                        <div className="h-full flex gap-6 p-6 min-w-max">
+                            <Column title="To Do" status="todo" icon={AlertCircle} />
+                            <Column title="In Progress" status="in_progress" icon={Clock} />
+                            <Column title="Done" status="done" icon={CheckCircle2} />
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Create Modal */}
+            {isCreateModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-in fade-in zoom-in duration-200">
+                        <form onSubmit={handleCreateSubmit} className="p-6">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-xl font-serif font-bold">Create Task</h3>
+                                <button type="button" onClick={() => setIsCreateModalOpen(false)}><X className="text-gray-400 hover:text-gray-600" /></button>
+                            </div>
+                            <div className="space-y-4">
+                                <input required placeholder="Task Title" className="w-full p-3 bg-gray-50 rounded-lg border border-gray-200 focus:border-brand-lime outline-none" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} />
+                                <div className="grid grid-cols-2 gap-4">
+                                    <select required className="p-3 bg-gray-50 rounded-lg border border-gray-200" value={formData.client} onChange={e => setFormData({ ...formData, client: e.target.value })}>
+                                        <option value="">Select Client</option>
+                                        {clients.map(c => <option key={c.id} value={c.companyName}>{c.companyName}</option>)}
+                                    </select>
+                                    <select className="p-3 bg-gray-50 rounded-lg border border-gray-200" value={formData.priority} onChange={e => setFormData({ ...formData, priority: e.target.value as any })}>
+                                        <option value="low">Low Priority</option>
+                                        <option value="medium">Medium Priority</option>
+                                        <option value="high">High Priority</option>
+                                    </select>
+                                </div>
+                                <input type="date" className="w-full p-3 bg-gray-50 rounded-lg border border-gray-200" value={formData.dueDate} onChange={e => setFormData({ ...formData, dueDate: e.target.value })} />
+                                <textarea placeholder="Description (optional)" className="w-full p-3 bg-gray-50 rounded-lg border border-gray-200 h-24 resize-none" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} />
+                            </div>
+                            <div className="flex gap-3 mt-6">
+                                <Button type="button" variant="secondary" onClick={() => setIsCreateModalOpen(false)} className="flex-1">Cancel</Button>
+                                <Button type="submit" className="flex-1">Create Task</Button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             )}
 
-            {/* Modal */}
-            {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white rounded-xl p-8 w-full max-w-md shadow-2xl relative">
-                        <h3 className="text-2xl font-serif font-bold text-brand-black mb-6">Create New Task</h3>
-
-                        <form onSubmit={handleAddTask} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-brand-text-muted mb-1">Task Title</label>
-                                <input
-                                    type="text"
-                                    required
-                                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none transition-all bg-gray-50 text-brand-black"
-                                    value={title}
-                                    onChange={(e) => setTitle(e.target.value)}
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-brand-text-muted mb-1">Assigned Client</label>
-                                <select
-                                    required
-                                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none transition-all bg-gray-50 text-brand-black"
-                                    value={assignedClient}
-                                    onChange={(e) => setAssignedClient(e.target.value)}
-                                >
-                                    <option value="">Select Client</option>
-                                    {clients.map(client => (
-                                        <option key={client.id} value={client.companyName}>{client.companyName}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
+            {/* Edit/Details Modal */}
+            {editingTask && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-in fade-in zoom-in duration-200">
+                        <form onSubmit={handleEditSubmit} className="p-6">
+                            <div className="flex justify-between items-start mb-6">
                                 <div>
-                                    <label className="block text-sm font-medium text-brand-text-muted mb-1">Priority</label>
-                                    <select
-                                        className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none transition-all bg-gray-50 text-brand-black"
-                                        value={priority}
-                                        onChange={(e) => setPriority(e.target.value as 'low' | 'medium' | 'high')}
-                                    >
-                                        <option value="low">Low</option>
-                                        <option value="medium">Medium</option>
-                                        <option value="high">High</option>
-                                    </select>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                                            {formatAppId(editingTask.sourceAppId)}
+                                        </span>
+                                        <span className="text-xs text-gray-300">•</span>
+                                        <span className="text-xs font-mono text-gray-300">{editingTask.id.slice(0, 8)}</span>
+                                    </div>
+                                    <h3 className="text-xl font-serif font-bold">Edit Task</h3>
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-brand-text-muted mb-1">Due Date</label>
-                                    <input
-                                        type="date"
-                                        required
-                                        className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none transition-all bg-gray-50 text-brand-black"
-                                        value={dueDate}
-                                        onChange={(e) => setDueDate(e.target.value)}
-                                    />
+                                <button type="button" onClick={() => setEditingTask(null)}><X className="text-gray-400 hover:text-gray-600" /></button>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-gray-500 uppercase">Title</label>
+                                    <input required className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-brand-lime outline-none font-medium" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Status</label>
+                                        <select className="w-full p-3 bg-white border border-gray-200 rounded-lg" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as any })}>
+                                            <option value="todo">To Do</option>
+                                            <option value="in_progress">In Progress</option>
+                                            <option value="done">Done</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Priority</label>
+                                        <select className="w-full p-3 bg-white border border-gray-200 rounded-lg" value={formData.priority} onChange={e => setFormData({ ...formData, priority: e.target.value as any })}>
+                                            <option value="low">Low</option>
+                                            <option value="medium">Medium</option>
+                                            <option value="high">High</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-gray-500 uppercase">Description</label>
+                                    <textarea className="w-full p-3 bg-white border border-gray-200 rounded-lg h-24 resize-none" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} />
+                                </div>
+
+                                <div className="flex justify-between items-center pt-2 text-xs text-gray-400">
+                                    <span>Created: {editingTask.createdAt?.toDate().toLocaleDateString() || 'Unknown'}</span>
+                                    {editingTask.sourceAppId !== '2h_hub_v1' && (
+                                        <span className="flex items-center gap-1">
+                                            <ExternalLink size={12} /> External App Task
+                                        </span>
+                                    )}
                                 </div>
                             </div>
 
-                            <div className="flex gap-3 mt-8">
-                                <Button type="button" variant="secondary" onClick={() => setIsModalOpen(false)} className="flex-1">
-                                    Cancel
-                                </Button>
-                                <Button type="submit" variant="primary" className="flex-1">
-                                    Create Task
-                                </Button>
+                            <div className="flex gap-3 mt-8 pt-4 border-t border-gray-100">
+                                <button type="button" onClick={handleDeleteTask} className="px-4 py-2 text-red-500 hover:bg-red-50 rounded-lg flex items-center gap-2 transition-colors">
+                                    <Trash2 size={18} /> Delete
+                                </button>
+                                <div className="flex-1 flex gap-3 justify-end">
+                                    <Button type="button" variant="secondary" onClick={() => setEditingTask(null)}>Cancel</Button>
+                                    <Button type="submit" className="flex items-center gap-2"><Save size={18} /> Save Changes</Button>
+                                </div>
                             </div>
                         </form>
                     </div>
