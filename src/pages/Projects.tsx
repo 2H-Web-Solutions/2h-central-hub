@@ -78,10 +78,27 @@ const GLOBAL_RULES = `
    - Server-Side (n8n/Vercel): Use Service Accounts/API Keys stored in Env Vars.
    - Error Handling: Fail gracefully. If n8n doesn't respond, show UI feedback.
 
-6. UI/UX STANDARDS
-   - Font: Headers='Federo', Body='Barlow'.
-   - Colors: Strict usage of Brand Colors defined in Tailwind config.
-   - Layout: Sticky Sidebar (Dark), Scrollable Content (Light).
+7. UI/UX MASTER BLUEPRINT (THE "2H SHELL")
+      Every app must use this exact layout structure:
+      
+      A. SIDEBAR (Fixed Left, Width: 64, Theme: Dark/Brand-Dark)
+         - TOP AREA:
+           - Logo Image (Top Left, max-h-10).
+           - App Name (H1, Font: Serif/Federo, Color: Brand-Primary).
+           - Divider Line (Border-Gray-800).
+         - MIDDLE AREA:
+           - Navigation Menu (Vertical list, Lucide Icons, Hover: Brand-Primary).
+         - BOTTOM AREA:
+           - "System Online" Indicator (Green Dot + Text, Text-xs, Gray-500).
+           - Divider Line above it.
+
+      B. HEADER (Fixed Top, Height: 16, Theme: Dark or Light depending on Client DNA)
+         - Title of the current page.
+         - User Profile / Settings trigger.
+
+      C. MAIN CONTENT (Scrollable, Theme: Light/#F0F0F3)
+         - Padding: p-6 or p-8.
+         - Cards: White background, slight shadow, rounded-lg.
 `;
 
 export default function Projects() {
@@ -580,8 +597,8 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
                             </button>
                         </div>
 
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                            {/* Left: Inputs */}
+                        <div className="w-full max-w-2xl mx-auto">
+                            {/* Inputs */}
                             <div className="space-y-6 overflow-y-auto max-h-[70vh] pr-2">
                                 {/* Section 1: Basic Info */}
                                 <div className="space-y-4">
@@ -700,29 +717,6 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
                                 </div>
 
 
-                            </div>
-
-                            {/* Right: Magic Preview */}
-                            <div className="bg-zinc-900 rounded-xl p-4 overflow-hidden flex flex-col h-[70vh]">
-                                <h4 className="text-sm font-bold text-brand-lime mb-2">Generated Workspace Prompt</h4>
-
-                                {selectedClient ? (
-                                    <>
-                                        <div className="flex-1 overflow-y-auto mb-4 text-xs font-mono text-gray-300 whitespace-pre-wrap">
-                                            {generatedPrompt}
-                                        </div>
-                                        <button
-                                            onClick={copyToClipboard}
-                                            className="w-full py-2 bg-brand-lime text-brand-black font-bold rounded-lg text-xs hover:bg-white transition-colors"
-                                        >
-                                            Copy Prompt to Clipboard
-                                        </button>
-                                    </>
-                                ) : (
-                                    <div className="flex-1 flex items-center justify-center text-gray-600 text-xs text-center p-4">
-                                        Select a client to generate the prompt.
-                                    </div>
-                                )}
                             </div>
                         </div>
 

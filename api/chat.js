@@ -62,7 +62,7 @@ export default async function handler(req, res) {
 
         // *** CRITICAL: FORCING GEMINI 3 PRO PREVIEW ***
         const model = genAI.getGenerativeModel({
-            model: 'gemini-3-pro-preview',
+            model: 'gemini-3-flash-preview',
             generationConfig: {
                 temperature: temp,
                 maxOutputTokens: 8192,
