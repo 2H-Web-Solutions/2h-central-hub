@@ -76,10 +76,10 @@ export default async function handler(req, res) {
         const selectedMode = agentMode || 'STARTER';
         const systemInstruction = PROMPTS[selectedMode] || PROMPTS.STARTER;
 
-        // TEMPERATURE SETTING
-        const temp = selectedMode === 'STARTER' ? 0.2 : 0.7;
+        // TEMPERATURE SETTING (Optimized for Gemini 3)
+        const temp = 1.0;
 
-        // *** CRITICAL: FORCING GEMINI 3 PRO PREVIEW ***
+        // *** CRITICAL: FORCING GEMINI 3 FLASH PREVIEW ***
         const model = genAI.getGenerativeModel({
             model: 'gemini-3-flash-preview',
             generationConfig: {
