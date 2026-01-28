@@ -78,6 +78,24 @@ const GLOBAL_RULES = `
    - Server-Side (n8n/Vercel): Use Service Accounts/API Keys stored in Env Vars.
    - Error Handling: Fail gracefully. If n8n doesn't respond, show UI feedback.
 
+6. GLOBAL AGENT PROTOCOL (MISSION CONTROL)
+   All AI Chat features must follow this strict schema to be visible in the Central Hub:
+   
+   A. DATA PATH:
+      - Sessions: 'apps/{APP_ID}/sessions/{sessionId}'
+      - Messages: 'apps/{APP_ID}/sessions/{sessionId}/messages/{msgId}'
+   
+   B. SESSION FIELDS (Required):
+      - agentName: string (e.g., "Campaign Creator", "Support Bot")
+      - status: 'active' | 'archived'
+      - lastMessage: string
+      - updatedAt: serverTimestamp()
+   
+   C. MESSAGE FIELDS:
+      - role: 'user' | 'ai'
+      - content: string
+      - createdAt: serverTimestamp()
+
 7. UI/UX MASTER BLUEPRINT (THE "2H SHELL")
       Every app must use this exact layout structure:
       
