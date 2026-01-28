@@ -30,13 +30,15 @@ const normalizeTask = (doc: any): Task => {
     return {
         id: doc.id,
         ref: doc.ref,
-        title: data.title || data.name || "Untitled Task",
-        assignedClient: data.assignedClient || "Unknown Client",
+        // Title Fallback Chain:
+        title: data.title || data.name || data.taskName || data.headline || "Untitled Task",
+        // Client/App Fallback:
+        assignedClient: data.assignedClient || data.clientName || data.client || "Unknown Client",
         status: normalizeStatus(data.status),
         priority: ['low', 'medium', 'high'].includes(data.priority) ? data.priority : 'medium',
         dueDate: data.dueDate?.toDate ? data.dueDate.toDate() : (data.due_date?.toDate ? data.due_date.toDate() : (data.dueDate ? new Date(data.dueDate) : null)),
         createdAt: data.createdAt,
-        sourceAppId: doc.ref.parent.parent?.id || '2h_hub_v1'
+        sourceAppId: data.sourceApp || data.appName || doc.ref.parent.parent?.id || '2h_hub_v1'
     };
 };
 
