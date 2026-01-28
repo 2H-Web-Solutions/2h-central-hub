@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, addDoc, onSnapshot, serverTimestamp, query, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, collectionGroup, addDoc, onSnapshot, serverTimestamp, query, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import Button from '../components/Button';
 import DashboardShell from '../components/DashboardShell';
@@ -13,12 +13,22 @@ interface Task {
     status: 'todo' | 'in_progress' | 'done';
     dueDate: string;
     createdAt?: Timestamp;
+    sourceAppId?: string;
 }
 
 interface Client {
     id: string;
     companyName: string;
 }
+
+
+const formatAppId = (appId: string) => {
+    return appId
+        .replace(/^2h_/, '')            // Remove prefix
+        .replace(/_v\d+$/, '')          // Remove version suffix
+        .replace(/_/g, ' ')             // Replace underscores with spaces
+        .replace(/\b\w/g, c => c.toUpperCase()); // Capitalize words
+};
 
 export default function Tasks() {
     const [tasks, setTasks] = useState<Task[]>([]);
@@ -35,14 +45,16 @@ export default function Tasks() {
     // Subscribe to Tasks
     useEffect(() => {
         const q = query(
-            collection(db, 'apps', '2h_hub_v1', 'tasks'),
+            collectionGroup(db, 'tasks'),
             orderBy('createdAt', 'desc')
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const taskList: Task[] = snapshot.docs.map(doc => ({
                 id: doc.id,
-                ...doc.data()
+                ...doc.data(),
+                sourceAppId: doc.ref.parent.parent?.id,
+
             } as Task));
             setTasks(taskList);
             setLoading(false);
@@ -94,12 +106,17 @@ export default function Tasks() {
                     <div key={task.id} className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-all cursor-pointer">
                         <div className="flex justify-between items-start mb-2">
                             <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${task.priority === 'high' ? 'bg-red-100 text-red-600' :
-                                task.priority === 'medium' ? 'bg-amber-100 text-amber-600' :
-                                    'bg-blue-100 text-blue-600'
+                                'bg-blue-100 text-blue-600'
                                 }`}>
                                 {task.priority}
                             </span>
-                            {task.dueDate && <span className="text-[10px] text-gray-400">{new Date(task.dueDate).toLocaleDateString()}</span>}
+                            {task.sourceAppId && task.sourceAppId !== '2h_hub_v1' && (
+                                <span className="text-[10px] font-medium bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                                    {formatAppId(task.sourceAppId)}
+                                </span>
+                            )}
+
+                            {task.dueDate && <span className="text-[10px] text-gray-400 ml-auto">{new Date(task.dueDate).toLocaleDateString()}</span>}
                         </div>
                         <h4 className="text-sm font-bold text-brand-black mb-1">{task.title}</h4>
                         <p className="text-xs text-brand-text-muted">{task.assignedClient}</p>
