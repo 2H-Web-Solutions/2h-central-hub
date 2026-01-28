@@ -79,7 +79,7 @@ export default async function handler(req, res) {
         // TEMPERATURE SETTING (Optimized for Gemini 3)
         const temp = 1.0;
 
-        // *** CRITICAL: FORCING GEMINI 3 FLASH PREVIEW ***
+        // *** CRITICAL: GEMINI 3 FLASH PREVIEW (OFFICIAL) ***
         const model = genAI.getGenerativeModel({
             model: 'gemini-3-flash-preview',
             generationConfig: {

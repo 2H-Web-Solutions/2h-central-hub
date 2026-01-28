@@ -1,3 +1,4 @@
+
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export default async function handler(req, res) {
@@ -16,7 +17,7 @@ export default async function handler(req, res) {
 
         if (!apiKey) return res.status(500).json({ error: 'Missing API Key' });
 
-        // 2. Initialize Gemini (Use Flash for speed & large context)
+        // 2. Initialize Gemini (Gemini 3 Flash for speed)
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
 
