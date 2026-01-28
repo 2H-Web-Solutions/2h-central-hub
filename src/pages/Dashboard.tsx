@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, onSnapshot } from 'firebase/firestore';
+import { collection, collectionGroup, query, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import Button from '../components/Button';
 import DashboardShell from '../components/DashboardShell';
@@ -10,7 +10,16 @@ interface Task {
     title: string;
     status: string;
     createdAt: any;
+    sourceAppId?: string;
 }
+
+const formatAppId = (appId: string) => {
+    return appId
+        .replace(/^2h_/, '')            // Remove prefix
+        .replace(/_v\d+$/, '')          // Remove version suffix
+        .replace(/_/g, ' ')             // Replace underscores with spaces
+        .replace(/\b\w/g, c => c.toUpperCase()); // Capitalize words
+};
 
 export default function Dashboard() {
     const [stats, setStats] = useState({
@@ -52,7 +61,7 @@ export default function Dashboard() {
         // But status is 'todo' | 'in_progress' | 'done'.
         // Easier to query where 'status', 'in', ['todo', 'in_progress'] OR just client-side filter if small.
         // Let's use clean query.
-        const qTasks = query(collection(db, 'apps', '2h_hub_v1', 'tasks'));
+        const qTasks = query(collectionGroup(db, 'tasks'));
         const unsubTasks = onSnapshot(qTasks, (snap) => {
             const openCount = snap.docs.filter(doc => doc.data().status !== 'done').length;
             setStats(prev => ({
@@ -65,7 +74,11 @@ export default function Dashboard() {
             // Actually, for "Recent Activity", we specifically want the LATEST tasks.
             // Managing two queries for tasks (one for count, one for list) is fine.
             // Or just sort this list client side:
-            const allTasks = snap.docs.map(d => ({ id: d.id, ...d.data() } as Task));
+            const allTasks = snap.docs.map(d => ({
+                id: d.id,
+                ...d.data(),
+                sourceAppId: d.ref.parent.parent?.id
+            } as Task));
             // Sort by createdAt desc
             allTasks.sort((a, b) => {
                 const tA = a.createdAt?.toMillis() || 0;
@@ -121,7 +134,14 @@ export default function Dashboard() {
                                     <div className={`w-2 h-2 rounded-full ${task.status === 'done' ? 'bg-emerald-500' : 'bg-brand-lime'
                                         }`}></div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-brand-text-main truncate">{task.title}</p>
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-sm font-medium text-brand-text-main truncate">{task.title}</p>
+                                            {task.sourceAppId && task.sourceAppId !== '2h_hub_v1' && (
+                                                <span className="text-[10px] font-medium bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                                                    {formatAppId(task.sourceAppId)}
+                                                </span>
+                                            )}
+                                        </div>
                                         <p className="text-xs text-brand-text-muted">
                                             {task.createdAt ? new Date(task.createdAt.seconds * 1000).toLocaleDateString() : 'Just now'}
                                         </p>
