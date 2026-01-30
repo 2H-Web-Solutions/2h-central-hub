@@ -260,12 +260,22 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
             });
 
             // 2. Call API
+            const metadata = `
+*** LIVE PROJECT METADATA ***
+- App Name: ${project?.name || project?.type || 'Unknown'}
+- Client: ${project?.clientName || 'Unknown'}
+- GitHub Repo: ${project?.githubUrl || 'Not set'}
+- Vercel URL: ${project?.vercelUrl || 'Not set'}
+- Firebase Config: ${JSON.stringify(project?.firebaseConfig || {}, null, 2)}
+`;
+            const combinedContext = (project?.memory || "") + "\n\n" + metadata;
+
             const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     message: currentInput + (currentAttachments.length > 0 ? `\n[With ${currentAttachments.length} images]` : ''),
-                    context: project?.memory || "You are a helpful assistant.",
+                    context: combinedContext,
                     agent: "Builder",
                     agentMode: agentMode,
                     history: messages.map(m => ({ role: m.role, content: m.content })),
