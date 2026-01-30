@@ -159,7 +159,7 @@ export default function Projects() {
     // Form State (Wizard)
     const [selectedClientId, setSelectedClientId] = useState('');
     const [appName, setAppName] = useState('');
-    const [appType, setAppType] = useState('Central Hub');
+    const [appType, setAppType] = useState('Custom App');
     const [version, setVersion] = useState('v1');
     const [includeTasks, setIncludeTasks] = useState(true);
     const [generatedPrompt, setGeneratedPrompt] = useState('');
@@ -262,7 +262,7 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
     const resetForm = () => {
         setSelectedClientId('');
         setAppName('');
-        setAppType('Central Hub');
+        setAppType('Custom App');
         setVersion('v1');
         setIncludeTasks(true);
 
@@ -658,19 +658,8 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <label className="block text-sm font-medium text-brand-text-muted mb-1">App Type</label>
-                                            <select
-                                                className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none transition-all bg-gray-50 text-brand-black"
-                                                value={appType}
-                                                onChange={(e) => setAppType(e.target.value)}
-                                            >
-                                                <option value="Central Hub">Central Hub</option>
-                                                <option value="Ads Manager">Ads Manager</option>
-                                                <option value="SEO Suite">SEO Suite</option>
-                                                <option value="Onboarding">Onboarding Portal</option>
-                                            </select>
-                                        </div>
-                                        <div>
+                                            {/* App Type removed from UI, defaults to Custom App */}
+                                            <input type="hidden" value={appType} />
                                             <label className="block text-sm font-medium text-brand-text-muted mb-1">Version</label>
                                             <input
                                                 type="text"

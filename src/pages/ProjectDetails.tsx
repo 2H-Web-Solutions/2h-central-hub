@@ -25,6 +25,7 @@ interface Project {
         appId?: string;
     };
     agentMode?: 'STARTER' | 'BUILDER' | 'SOLVER';
+    name?: string;
 }
 
 interface ChatMessage {
@@ -385,8 +386,8 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                 <div className="w-1/3 flex flex-col gap-6 overflow-y-auto pr-2">
                     {/* Header Card */}
                     <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-                        <h2 className="text-2xl font-serif font-bold text-brand-black mb-1">{project?.clientName}</h2>
-                        <span className="text-brand-lime font-medium text-sm">{project?.type}</span>
+                        <h1 className="text-3xl font-serif font-bold text-brand-black mb-1">{project?.name || project?.type}</h1>
+                        <span className="text-brand-lime font-medium text-sm">{project?.clientName}</span>
                     </div>
 
                     {/* Links Card */}
@@ -585,8 +586,8 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                                 <button
                                     onClick={handleSmartArchive}
                                     className={`text-xs font-medium bg-white border px-3 py-1.5 rounded-lg flex items-center gap-2 transition-colors shadow-sm ${agentMode === 'STARTER'
-                                            ? 'border-brand-lime text-brand-black ring-2 ring-brand-lime/20 animate-pulse'
-                                            : 'border-gray-200 text-gray-500 hover:text-brand-lime'
+                                        ? 'border-brand-lime text-brand-black ring-2 ring-brand-lime/20 animate-pulse'
+                                        : 'border-gray-200 text-gray-500 hover:text-brand-lime'
                                         }`}
                                     title="Sync memory to n8n & Clear"
                                 >

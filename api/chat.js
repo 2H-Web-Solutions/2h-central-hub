@@ -25,28 +25,9 @@ const PROMPTS = {
   `,
 
     BUILDER: `
-  ROLE: You are the "Interactive Implementation Coach" (Builder Assistant).
-  GOAL: Guide the user through complex feature implementation without overwhelming them.
-  TONE: Precise, direct, action-oriented. Use **Bold** for emphasis.
-
-  WORKFLOW (Follow Strictly):
-
-  PHASE 1: OVERVIEW & UNDERSTANDING
-  - First, analyze the user's request.
-  - Create a short, numbered "Pin-Point-List" (Roadmap) of the entire process.
-  - End with: "Ist dieser Ablauf für dich so korrekt? Sollen wir starten?"
-  - DO NOT provide execution details yet. Wait for confirmation.
-
-  PHASE 2: EXECUTION (THE LOOP)
-  - After confirmation, start the process.
-  - ATOMIC STEPS: Provide ONLY ONE single action step or task at a time.
-  - FOCUS: Explain only what is necessary for this exact step. Hide future details.
-  - INTERACTIVITY: Beende deine Antwort IMMER mit einer Frage oder Aufforderung wie: "Sag 'Weiter', wenn du das erledigt hast".
-  - WAIT: Never generate the next step before the current one is confirmed.
-
-  OUTPUT FORMAT:
-  - If a step requires code/file changes, ALWAYS provide a copy-pasteable Code Block labeled "Kopiere diesen Prompt in Antigravity:".
-  - Inside the block, write the imperative instructions for the IDE Agent.
+  ROLE: You are the "Builder" (Function Assistant).
+  GOAL: Collaboratively design and implement new features.
+  TONE: Interactive, consultative, creative.
   `,
 
     SOLVER: `
@@ -72,16 +53,13 @@ export default async function handler(req, res) {
 
         const genAI = new GoogleGenerativeAI(apiKey);
 
-        // SELECT AGENT MODE (Default: STARTER)
         const selectedMode = agentMode || 'STARTER';
         const systemInstruction = PROMPTS[selectedMode] || PROMPTS.STARTER;
+        const temp = selectedMode === 'STARTER' ? 0.2 : 0.7;
 
-        // TEMPERATURE SETTING (Optimized for Gemini 3)
-        const temp = 1.0;
-
-        // *** CRITICAL: GEMINI 3 FLASH PREVIEW (OFFICIAL) ***
+        // Force Gemini 3 Pro
         const model = genAI.getGenerativeModel({
-            model: 'gemini-3-flash-preview',
+            model: 'gemini-3-pro-preview',
             generationConfig: {
                 temperature: temp,
                 maxOutputTokens: 8192,
@@ -97,6 +75,7 @@ export default async function handler(req, res) {
             ).join('\n\n');
         }
 
+        // *** CRITICAL CHANGE: LANGUAGE ENFORCEMENT ***
         const finalPrompt = `
         ${systemInstruction}
 
@@ -106,9 +85,13 @@ export default async function handler(req, res) {
         HISTORY:
         ${conversationLog}
 
-        PRIME DIRECTIVE:
-        - Output format: Always use code blocks for Antigravity prompts.
-        - Language: Detect User language and match it.
+        *** CRITICAL OUTPUT RULES (HIGHEST PRIORITY) ***
+        1. OUTPUT FORMAT: Always use code blocks for Antigravity prompts.
+        2. LANGUAGE ENFORCEMENT:
+           - Analyze the "USER MESSAGE" below.
+           - IF User writes in ENGLISH -> YOU MUST REPLY IN ENGLISH.
+           - IF User writes in GERMAN -> YOU MUST REPLY IN GERMAN.
+           - Ignore the language of the System Prompt/History. Match the User ONLY.
 
         USER MESSAGE: ${message}
         `;
@@ -120,7 +103,6 @@ export default async function handler(req, res) {
 
     } catch (error) {
         console.error('API Error:', error);
-        // Return exact error to UI for debugging
         return res.status(500).json({ error: error.message });
     }
 }
