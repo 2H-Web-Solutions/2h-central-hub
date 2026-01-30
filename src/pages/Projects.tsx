@@ -78,23 +78,13 @@ const GLOBAL_RULES = `
    - Server-Side (n8n/Vercel): Use Service Accounts/API Keys stored in Env Vars.
    - Error Handling: Fail gracefully. If n8n doesn't respond, show UI feedback.
 
-6. GLOBAL AGENT PROTOCOL (MISSION CONTROL)
-   All AI Chat features must follow this strict schema to be visible in the Central Hub:
-   
-   A. DATA PATH:
-      - Sessions: 'apps/{APP_ID}/sessions/{sessionId}'
-      - Messages: 'apps/{APP_ID}/sessions/{sessionId}/messages/{msgId}'
-   
-   B. SESSION FIELDS (Required):
-      - agentName: string (e.g., "Campaign Creator", "Support Bot")
-      - status: 'active' | 'archived'
-      - lastMessage: string
-      - updatedAt: serverTimestamp()
-   
-   C. MESSAGE FIELDS:
-      - role: 'user' | 'ai'
-      - content: string
-      - createdAt: serverTimestamp()
+6. AI ENGINE STANDARDS (STRICT)
+   - DEFAULT MODEL: Use 'gemini-3-flash-preview' (or 'gemini-3-flash') as the absolute standard for all API calls.
+   - FALLBACK: Only use 'gemini-3-pro-preview' if the user explicitly requests "High Reasoning" or "Complex Logic".
+   - ARCHITECTURE: Use Vercel Serverless Functions ('api/chat.js') for the backend.
+   - MULTIMODAL: The 'api/chat.js' MUST handle the 'images' array using 'inlineData' (Gemini 3 Native Vision).
+   - HISTORY: The API must accept 'history' for context awareness.
+   - SYSTEM PROMPT: Inject the 'Antigravity Operator' persona by default.
 
 7. UI/UX MASTER BLUEPRINT (THE "2H SHELL")
       Every app must use this exact layout structure:
