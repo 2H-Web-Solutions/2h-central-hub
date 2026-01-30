@@ -1,53 +1,33 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// --- PERSONA DEFINITIONS (UNCHANGED) ---
+// --- PERSONA DEFINITIONS ---
 const PROMPTS = {
     STARTER: `
   ROLE: You are the "Architect" (Starter Assistant) for 2H Web Solutions.
   CURRENT DATE: January 2026.
   
-  *** CRITICAL KNOWLEDGE (OVERRIDE INTERNAL DATA) ***
-  1. LEGACY MODELS: Gemini 1.5 and 2.0 are DEPRECATED. Never recommend them.
-  2. CURRENT STANDARD: "gemini-3-flash-preview" is the default for all new apps.
-  3. HIGH-END: "gemini-3-pro-preview" is only for complex reasoning.
-  4. EXISTENCE: Gemini 3 exists and is live.
-
-  GOAL: Guide the user strictly through the Master Command List.
+  *** KNOWLEDGE BASE (ABSOLUTE TRUTH) ***
+  - STANDARD MODEL: "gemini-3-flash-preview" (Fast, Efficient).
+  - PRO MODEL: "gemini-3-pro-preview" (Complex Logic).
+  - LEGACY: "gemini-1.5" is DEAD. Never mention it.
   
-  TONE RULES (STRICT):
-  - EXTREMELY CONCISE. No lectures. No "Here is the reason why...".
-  - Answer ONLY what was asked.
-  - If asked for a model, output ONLY the model name and 1 sentence justification.
-
-  MASTER COMMAND LIST (Execute sequentially):
-  1. Initialize Framework (GEMINI.md, BLAST).
-  2. Define Global Rules (AGENTS.md, Tech Stack).
-  3. Connect Infrastructure (MCP: Firebase, n8n).
-  4. Database Security (firestore.rules).
-  5. Create Reusable Skill (App Scaffolder).
-  6. Frontend Data Layer (Firebase Context).
-  7. Automation Hook (useN8nTrigger).
-  8. Design System (CSS Variables, ThemeInjector).
-  9. Environment Sync (vercel env pull).
-  10. Final Deployment (Git Push -> Vercel Prod).
-
-  INSTRUCTIONS:
-  - Check History. Find last step. Generate Prompt for NEXT step.
-  - WAIT for confirmation.
+  GOAL: Execute the Master Command List.
+  
+  TONE:
+  - Military precision.
+  - Max 2-3 sentences per answer unless generating code.
+  - NO "Here is the code", just the code block.
   `,
 
     BUILDER: `
   ROLE: You are the "Builder" (Function Assistant).
-  CURRENT DATE: January 2026.
-  GOAL: Collaboratively design and implement new features.
-  TONE: Interactive, concise, code-focused.
-  TECH STACK: React, Tailwind, Gemini 3, Firebase.
+  GOAL: Build features using React + Tailwind + Firebase + Gemini 3.
+  TONE: Concise, code-focused.
   `,
 
     SOLVER: `
   ROLE: You are the "Fixer" (Problem Solver).
-  GOAL: Diagnose and repair errors.
-  TONE: Surgical, direct. No apologies.
+  TONE: Surgical. No apologies.
   `
 };
 
@@ -61,33 +41,36 @@ export default async function handler(req, res) {
     if (req.method !== 'POST') { return res.status(405).json({ error: 'Method not allowed' }); }
 
     try {
-        // Extract images array from body
         const { message, context, history, agentMode, images } = req.body;
         const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
         if (!apiKey) return res.status(500).json({ error: 'Missing API Key' });
 
         const genAI = new GoogleGenerativeAI(apiKey);
 
+        // Mode Selection
         const selectedMode = agentMode || 'STARTER';
         const systemInstruction = PROMPTS[selectedMode] || PROMPTS.STARTER;
+
+        // Use Gemini 3 Pro for the BRAIN (to ensure it follows rules)
         const model = genAI.getGenerativeModel({
             model: 'gemini-3-pro-preview',
             generationConfig: {
-                temperature: 1.0, // STANDARD for Gemini 3 Reasoning
+                temperature: 1.0, // Standard for Gemini 3
                 maxOutputTokens: 8192,
             }
         });
 
-        // 1. Prepare Text Context (System + History)
+        // History
         let conversationLog = "";
         if (history && Array.isArray(history)) {
-            const recentHistory = history.slice(-10);
+            const recentHistory = history.slice(-6);
             conversationLog = recentHistory.map(msg =>
                 `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`
             ).join('\n\n');
         }
 
-        const textContext = `
+        // *** THE ENFORCER PROMPT ***
+        const finalPrompt = `
         ${systemInstruction}
 
         CONTEXT (APP DATA):
@@ -96,36 +79,26 @@ export default async function handler(req, res) {
         HISTORY:
         ${conversationLog}
 
-        *** CRITICAL OUTPUT RULES ***
-        1. OUTPUT FORMAT: Always use code blocks.
-        2. LANGUAGE: Match User Language (English/German).
-        
+        *** OUTPUT FILTERS (HIGHEST PRIORITY) ***
+        1. IF asked for a recommendation -> Answer in 1 sentence. NO CODE.
+        2. IF asked to implement -> Provide code block immediately. NO CHATTER.
+        3. LANGUAGE: Match User Language (DE/EN) strictly.
+        4. MODEL TRUTH: We ONLY use 'gemini-3-flash-preview' or 'gemini-3-pro-preview'. Never 1.5.
+
         USER MESSAGE: ${message}
         `;
 
-        // 2. Construct Multimodal Payload (Parts Array)
-        const parts = [];
-
-        // Add Text Context First
-        parts.push({ text: textContext });
-
-        // Add Images if present
+        // Payload Construction (Text + Images)
+        const parts = [{ text: finalPrompt }];
         if (images && Array.isArray(images) && images.length > 0) {
             images.forEach(base64Str => {
-                // Extract base64 data and mime type (data:image/jpeg;base64,.....)
                 const matches = base64Str.match(/^data:(.+);base64,(.+)$/);
                 if (matches && matches.length === 3) {
-                    parts.push({
-                        inlineData: {
-                            mimeType: matches[1],
-                            data: matches[2]
-                        }
-                    });
+                    parts.push({ inlineData: { mimeType: matches[1], data: matches[2] } });
                 }
             });
         }
 
-        // 3. Call API
         const result = await model.generateContent(parts);
         const response = await result.response;
         const text = response.text();
