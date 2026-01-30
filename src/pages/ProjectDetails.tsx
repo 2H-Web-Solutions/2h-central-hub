@@ -327,36 +327,58 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
     // --- CHAT MANAGEMENT ---
 
     const handleSmartArchive = async () => {
-        if (!projectId) return;
-        if (messages.length === 0) return;
+        if (!projectId || !project) return;
+        if (messages.length === 0) {
+            toast.error("No chat history to archive.");
+            return;
+        }
 
         const toastId = toast.loading("Archiving session knowledge...");
+
         try {
-            await fetch('/api/archive', {
+            // 1. Call Serverless Archiver
+            const response = await fetch('/api/archive', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    sessionId: project?.id || projectId,
-                    currentContext: project?.memory || ""
+                    currentMemory: project.memory || "",
+                    chatHistory: messages.map(m => ({ role: m.role, content: m.content }))
                 })
             });
-            toast.success("Session archived successfully", { id: toastId });
-            handleWipeChat(); // Clear after archive
+
+            if (!response.ok) throw new Error("Archive API failed");
+
+            const data = await response.json();
+            const newMemory = data.newMemory;
+
+            if (!newMemory) throw new Error("No memory returned");
+
+            // 2. Save new Memory to Firestore
+            const docRef = doc(db, 'apps', '2h_hub_v1', 'projects', projectId);
+            await updateDoc(docRef, { memory: newMemory });
+
+            // 3. Update Local State
+            setProject(prev => prev ? ({ ...prev, memory: newMemory }) : null);
+            setMemory(newMemory);
+
+            toast.success("Knowledge Base updated!", { id: toastId });
+
+            // 4. Wipe Chat & Auto-Transition
+            await handleWipeChat(true); // Pass true to skip confirm dialog
+
+            if (agentMode === 'STARTER') {
+                handleModeChange('BUILDER');
+            }
+
         } catch (error) {
             console.error("Archive failed:", error);
             toast.error("Archive failed.", { id: toastId });
-        } finally {
-            // Auto-transition to Builder Mode if currently in Starter
-            if (agentMode === 'STARTER') {
-                handleModeChange('BUILDER');
-                toast.success("Transitioning to Builder Mode for Feature Development", { icon: '🚀' });
-            }
         }
     };
 
-    const handleWipeChat = async () => {
+    const handleWipeChat = async (skipConfirm = false) => {
         if (!projectId) return;
-        if (!window.confirm("Are you sure you want to WIPE the chat history? This cannot be undone.")) return;
+        if (!skipConfirm && !window.confirm("Are you sure you want to WIPE the chat history? This cannot be undone.")) return;
 
         try {
             const chatColl = collection(db, 'apps', '2h_hub_v1', 'projects', projectId, 'chat');
@@ -604,7 +626,7 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                                     <Archive size={14} /> Smart Archive
                                 </button>
                                 <button
-                                    onClick={handleWipeChat}
+                                    onClick={() => handleWipeChat()}
                                     className="text-xs font-medium text-red-400 hover:text-red-600 bg-white border border-red-100 hover:border-red-200 px-3 py-1.5 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
                                     title="Delete messages without saving"
                                 >
