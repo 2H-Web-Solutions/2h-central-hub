@@ -5,7 +5,7 @@ import { db } from '../lib/firebase';
 import DashboardShell from '../components/DashboardShell';
 import SidebarNav from '../components/SidebarNav';
 import Button from '../components/Button';
-import { Github, Globe, ExternalLink, MessageSquare, Trash2, Lock, Copy, Paperclip, X, Archive, Map, Hammer, Bug } from 'lucide-react';
+import { Github, Globe, ExternalLink, MessageSquare, Trash2, Lock, Copy, Paperclip, X, Archive, Map, Hammer, Bug, BookOpen, Edit2, Plus, PenSquare } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Project {
@@ -36,6 +36,12 @@ interface ChatMessage {
     timestamp: any;
 }
 
+interface parsedLog {
+    title: string;
+    date: string;
+    content: string;
+}
+
 export default function ProjectDetails() {
     const { projectId } = useParams();
     const navigate = useNavigate();
@@ -46,6 +52,14 @@ export default function ProjectDetails() {
     const [githubUrl, setGithubUrl] = useState('');
     const [vercelUrl, setVercelUrl] = useState('');
     const [memory, setMemory] = useState('');
+
+    // Knowledge Base Tabs
+    const [knowledgeTab, setKnowledgeTab] = useState<'timeline' | 'editor'>('timeline');
+    const [parsedLogs, setParsedLogs] = useState<parsedLog[]>([]);
+    const [isAddingNote, setIsAddingNote] = useState(false);
+    const [newNoteTitle, setNewNoteTitle] = useState('');
+    const [newNoteContent, setNewNoteContent] = useState('');
+
 
     // Firebase Config Form States
     const [apiKey, setApiKey] = useState('');
@@ -102,12 +116,48 @@ export default function ProjectDetails() {
         return () => unsubscribe();
     }, [projectId, navigate]);
 
-    // Sync memory from project
+
+    // Parse Memory to Logs
     useEffect(() => {
         if (project?.memory) {
             setMemory(project.memory);
+            setParsedLogs(parseMemoryToLogs(project.memory));
+        } else {
+            setParsedLogs([]);
         }
     }, [project]);
+
+    // Helper: Parse Memory String
+    const parseMemoryToLogs = (memoryString: string): parsedLog[] => {
+        if (!memoryString) return [];
+        // Split by markdown H2 '## '
+        const rawChunks = memoryString.split(/(?=^## )/gm);
+
+        return rawChunks.map(chunk => {
+            const lines = chunk.trim().split('\n');
+            const titleLine = lines[0].replace(/^## /, '').trim();
+
+            // Extract Date if present in title (e.g., "Title - 2024-01-30")
+            // Looking for YYYY-MM-DD at the end or embedded
+            const dateMatch = titleLine.match(/(\d{4}-\d{2}-\d{2})/);
+            const date = dateMatch ? dateMatch[0] : 'No Date';
+
+            // Clean title by removing date if it's at the end
+            let cleanTitle = titleLine.replace(/\s*-\s*\d{4}-\d{2}-\d{2}$/, '').substring(0, 40); // truncate for UI
+            if (cleanTitle.length === 40) cleanTitle += "...";
+
+            const content = lines.slice(1).join('\n').trim();
+
+            if (!chunk.trim()) return null; // skip empty chunks
+
+            return {
+                title: cleanTitle || "Untitled Log",
+                date: date,
+                content: content
+            };
+        }).filter(log => log !== null) as parsedLog[];
+    };
+
 
     // Subscribe to Chat Messages
     useEffect(() => {
@@ -137,6 +187,25 @@ export default function ProjectDetails() {
             console.error(`Error updating ${field}:`, error);
         }
     };
+
+    const handleAddNote = async () => {
+        if (!newNoteTitle.trim() || !newNoteContent.trim() || !projectId) return;
+
+        const dateStr = new Date().toISOString().split('T')[0];
+        const newLogEntry = `## ${newNoteTitle} - ${dateStr}\n\n${newNoteContent}`;
+
+        const newMemory = (newLogEntry + "\n\n" + (project?.memory || "")).trim();
+
+        // Update Firestore
+        await handleUpdateField('memory', newMemory);
+
+        // Reset Form
+        setNewNoteTitle('');
+        setNewNoteContent('');
+        setIsAddingNote(false);
+        toast.success("Note added to timeline");
+    };
+
 
     const handleModeChange = async (newMode: 'STARTER' | 'BUILDER' | 'SOLVER') => {
         setAgentMode(newMode);
@@ -549,21 +618,119 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                         </div>
                     </div>
 
-                    {/* Persistent Memory */}
-                    <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex-1 flex flex-col">
-                        <h3 className="font-bold text-gray-900 border-b pb-2 mb-4 flex items-center gap-2">
-                            <MessageSquare size={16} /> Project Knowledge
-                        </h3>
-                        <p className="text-xs text-gray-400 mb-2">
-                            This context is permanently available to the builder assistant.
-                        </p>
-                        <textarea
-                            className="flex-1 w-full p-4 rounded-lg border border-gray-200 text-sm focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none bg-gray-50 resize-none font-mono leading-relaxed"
-                            placeholder="Add specific rules, preferences, or tech stack details here..."
-                            value={memory}
-                            onChange={(e) => setMemory(e.target.value)}
-                            onBlur={() => handleUpdateField('memory', memory)}
-                        ></textarea>
+                    {/* Persistent Memory / Knowledge Timeline */}
+                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm flex-1 flex flex-col overflow-hidden">
+                        {/* Tabs Header */}
+                        <div className="flex border-b border-gray-100 px-6 pt-4 pb-0 gap-6">
+                            <button
+                                onClick={() => setKnowledgeTab('timeline')}
+                                className={`pb-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${knowledgeTab === 'timeline'
+                                        ? 'border-brand-lime text-brand-black'
+                                        : 'border-transparent text-gray-400 hover:text-gray-600'
+                                    }`}
+                            >
+                                <BookOpen size={16} /> Timeline
+                            </button>
+                            <button
+                                onClick={() => setKnowledgeTab('editor')}
+                                className={`pb-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${knowledgeTab === 'editor'
+                                        ? 'border-brand-lime text-brand-black'
+                                        : 'border-transparent text-gray-400 hover:text-gray-600'
+                                    }`}
+                            >
+                                <Edit2 size={16} /> Raw Editor
+                            </button>
+                        </div>
+
+                        {/* Content Area */}
+
+                        {/* 1. Timeline View */}
+                        {knowledgeTab === 'timeline' && (
+                            <div className="flex-1 flex flex-col relative overflow-hidden">
+                                {/* Add Note Header */}
+                                <div className="p-4 border-b border-gray-50 flex justify-between items-center bg-gray-50/30">
+                                    <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Logbook Entries</span>
+                                    <button
+                                        onClick={() => setIsAddingNote(!isAddingNote)}
+                                        className="bg-brand-black text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-gray-800 transition-colors shadow-sm"
+                                    >
+                                        <Plus size={14} /> Add Note
+                                    </button>
+                                </div>
+
+                                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                                    {/* Add Note Form */}
+                                    {isAddingNote && (
+                                        <div className="bg-brand-lime/10 border border-brand-lime/30 p-4 rounded-xl mb-4 animate-in fade-in slide-in-from-top-4">
+                                            <div className="flex justify-between items-center mb-3">
+                                                <h4 className="text-sm font-bold text-brand-black flex items-center gap-2">
+                                                    <PenSquare size={16} /> New Entry
+                                                </h4>
+                                                <button onClick={() => setIsAddingNote(false)} className="text-gray-400 hover:text-gray-600">
+                                                    <X size={16} />
+                                                </button>
+                                            </div>
+                                            <input
+                                                type="text"
+                                                className="w-full mb-3 px-3 py-2 rounded-lg border border-brand-lime/30 text-sm focus:ring-1 focus:ring-brand-lime outline-none bg-white font-bold"
+                                                placeholder="Title (e.g., Feature Update)"
+                                                value={newNoteTitle}
+                                                onChange={(e) => setNewNoteTitle(e.target.value)}
+                                            />
+                                            <textarea
+                                                className="w-full mb-3 px-3 py-2 rounded-lg border border-brand-lime/30 text-sm focus:ring-1 focus:ring-brand-lime outline-none bg-white min-h-[100px] resize-none"
+                                                placeholder="What happened?"
+                                                value={newNoteContent}
+                                                onChange={(e) => setNewNoteContent(e.target.value)}
+                                            />
+                                            <div className="flex justify-end">
+                                                <Button onClick={handleAddNote} disabled={!newNoteTitle || !newNoteContent}>
+                                                    Save Entry
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Logs List */}
+                                    {parsedLogs.length === 0 ? (
+                                        <div className="text-center py-10 text-gray-400 text-sm italic">
+                                            No logs yet. Use Smart Archive or Add Note.
+                                        </div>
+                                    ) : (
+                                        parsedLogs.map((log, idx) => (
+                                            <details key={idx} className="group bg-gray-50 border border-gray-100 rounded-xl open:bg-white open:shadow-md transition-all duration-200">
+                                                <summary className="flex items-center justify-between p-4 cursor-pointer font-medium text-gray-700 hover:text-brand-black select-none list-none">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-brand-lime group-open:scale-125 transition-transform"></div>
+                                                        <span className="font-bold">{log.title}</span>
+                                                    </div>
+                                                    <span className="text-xs font-mono text-gray-400 bg-white px-2 py-1 rounded border border-gray-100">{log.date}</span>
+                                                </summary>
+                                                <div className="px-4 pb-4 pt-0 text-sm text-gray-600 whitespace-pre-wrap leading-relaxed pl-8 border-t border-gray-50 mt-2">
+                                                    {log.content}
+                                                </div>
+                                            </details>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 2. Raw Editor View */}
+                        {knowledgeTab === 'editor' && (
+                            <div className="flex-1 flex flex-col p-4">
+                                <p className="text-xs text-brand-text-muted mb-2 flex items-center gap-2">
+                                    <Lock size={12} /> Direct Memory Access
+                                </p>
+                                <textarea
+                                    className="flex-1 w-full p-4 rounded-lg border border-gray-200 text-sm focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none bg-gray-50 resize-none font-mono leading-relaxed"
+                                    placeholder="Add specific rules, preferences, or tech stack details here..."
+                                    value={memory}
+                                    onChange={(e) => setMemory(e.target.value)}
+                                    onBlur={() => handleUpdateField('memory', memory)}
+                                ></textarea>
+                            </div>
+                        )}
                     </div>
                 </div>
 
