@@ -333,46 +333,49 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
             return;
         }
 
-        const toastId = toast.loading("Archiving session knowledge...");
+        const toastId = toast.loading("Writing Logbook Entry...");
 
         try {
-            // 1. Call Serverless Archiver
+            // 1. Generate Log Entry (Only sends chat history, not full memory)
             const response = await fetch('/api/archive', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    currentMemory: project.memory || "",
                     chatHistory: messages.map(m => ({ role: m.role, content: m.content }))
                 })
             });
 
-            if (!response.ok) throw new Error("Archive API failed");
+            if (!response.ok) throw new Error("Logbook API failed");
 
             const data = await response.json();
-            const newMemory = data.newMemory;
+            const newEntry = data.newEntry;
 
-            if (!newMemory) throw new Error("No memory returned");
+            if (!newEntry) throw new Error("No entry returned");
 
-            // 2. Save new Memory to Firestore
+            // 2. Append to Top (Logbook Style)
+            // Keep existing memory, add new entry at the top with a separator
+            const currentMemory = project.memory || "";
+            const updatedMemory = (newEntry + "\n\n" + currentMemory).trim();
+
+            // 3. Save to Firestore
             const docRef = doc(db, 'apps', '2h_hub_v1', 'projects', projectId);
-            await updateDoc(docRef, { memory: newMemory });
+            await updateDoc(docRef, { memory: updatedMemory });
 
-            // 3. Update Local State
-            setProject(prev => prev ? ({ ...prev, memory: newMemory }) : null);
-            setMemory(newMemory);
+            // 4. Update UI
+            setProject(prev => prev ? ({ ...prev, memory: updatedMemory }) : null);
+            setMemory(updatedMemory);
 
-            toast.success("Knowledge Base updated!", { id: toastId });
+            toast.success("Logbook updated!", { id: toastId });
 
-            // 4. Wipe Chat & Auto-Transition
-            await handleWipeChat(true); // Pass true to skip confirm dialog
-
+            // 5. Cleanup
+            await handleWipeChat(true);
             if (agentMode === 'STARTER') {
                 handleModeChange('BUILDER');
             }
 
         } catch (error) {
             console.error("Archive failed:", error);
-            toast.error("Archive failed.", { id: toastId });
+            toast.error("Logbook entry failed.", { id: toastId });
         }
     };
 

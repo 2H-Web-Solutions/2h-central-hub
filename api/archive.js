@@ -1,28 +1,48 @@
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
 export default async function handler(req, res) {
-    // CORS Headers
     res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
 
     if (req.method === 'OPTIONS') { res.status(200).end(); return; }
+    if (req.method !== 'POST') { return res.status(405).json({ error: 'Method not allowed' }); }
 
     try {
-        const { sessionId, currentContext } = req.body;
+        const { chatHistory } = req.body; // We DON'T need currentMemory anymore for this step
+        const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
+        if (!apiKey) return res.status(500).json({ error: 'Missing API Key' });
 
-        // Call n8n Webhook (Server-to-Server)
-        const n8nResponse = await fetch('https://up-seo-2025.app.n8n.cloud/webhook/archive-session', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sessionId, currentContext })
-        });
+        const genAI = new GoogleGenerativeAI(apiKey);
+        // Use Flash for speed
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
-        if (!n8nResponse.ok) throw new Error('n8n returned error');
+        const prompt = `
+        ROLE: Technical Logbook Writer.
+        TASK: Summarize the following Development Chat Session into a concise Log Entry.
+        
+        RULES:
+        1. NO CODE. Only high-level decisions, added features, and defined rules.
+        2. FORMAT STRICTLY AS:
+           ## [Short Action Title] - ${new Date().toISOString().split('T')[0]}
+           * **Done:** [List completed tasks]
+           * **Decisions:** [List architectural choices]
+           * **Todo:** [Next steps mentioned]
+        3. IGNORE: Small talk, typos, failed attempts.
+        
+        CHAT LOG:
+        ${JSON.stringify(chatHistory)}
+        `;
 
-        const data = await n8nResponse.json();
-        res.status(200).json(data);
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const newEntry = response.text();
+
+        return res.status(200).json({ newEntry });
 
     } catch (error) {
         console.error('Archive Error:', error);
-        res.status(500).json({ error: error.message });
+        return res.status(500).json({ error: error.message });
     }
 }
