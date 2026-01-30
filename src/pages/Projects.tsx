@@ -85,7 +85,8 @@ const GLOBAL_RULES = `
      b) Deep Reasoning/Coding capabilities.
      c) Heavy Multimodal Analysis.
    - IMPLEMENTATION RULE: When building the backend ('api/chat.js') for a new app, the Architect MUST ask: "Shall we use Flash (Speed) or Pro (Reasoning)?" or decide based on complexity.
-   - CONFIGURATION: Always set `temperature: 1.0` for Gemini 3 models.
+   - CONFIGURATION: Always set 'temperature: 1.0' for Gemini 3 models.
+
 
 7. UI/UX MASTER BLUEPRINT (THE "2H SHELL")
       Every app must use this exact layout structure:
