@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// --- PERSONA DEFINITIONS ---
+// --- PERSONA DEFINITIONS (UNCHANGED) ---
 const PROMPTS = {
     STARTER: `
   ROLE: You are the "Architect" (Starter Assistant).
@@ -47,7 +47,8 @@ export default async function handler(req, res) {
     if (req.method !== 'POST') { return res.status(405).json({ error: 'Method not allowed' }); }
 
     try {
-        const { message, context, history, agentMode } = req.body;
+        // Extract images array from body
+        const { message, context, history, agentMode, images } = req.body;
         const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
         if (!apiKey) return res.status(500).json({ error: 'Missing API Key' });
 
@@ -57,7 +58,6 @@ export default async function handler(req, res) {
         const systemInstruction = PROMPTS[selectedMode] || PROMPTS.STARTER;
         const temp = selectedMode === 'STARTER' ? 0.2 : 0.7;
 
-        // Force Gemini 3 Pro
         const model = genAI.getGenerativeModel({
             model: 'gemini-3-pro-preview',
             generationConfig: {
@@ -66,7 +66,7 @@ export default async function handler(req, res) {
             }
         });
 
-        // Format history
+        // 1. Prepare Text Context (System + History)
         let conversationLog = "";
         if (history && Array.isArray(history)) {
             const recentHistory = history.slice(-10);
@@ -75,8 +75,7 @@ export default async function handler(req, res) {
             ).join('\n\n');
         }
 
-        // *** CRITICAL CHANGE: LANGUAGE ENFORCEMENT ***
-        const finalPrompt = `
+        const textContext = `
         ${systemInstruction}
 
         CONTEXT (APP DATA):
@@ -85,18 +84,37 @@ export default async function handler(req, res) {
         HISTORY:
         ${conversationLog}
 
-        *** CRITICAL OUTPUT RULES (HIGHEST PRIORITY) ***
-        1. OUTPUT FORMAT: Always use code blocks for Antigravity prompts.
-        2. LANGUAGE ENFORCEMENT:
-           - Analyze the "USER MESSAGE" below.
-           - IF User writes in ENGLISH -> YOU MUST REPLY IN ENGLISH.
-           - IF User writes in GERMAN -> YOU MUST REPLY IN GERMAN.
-           - Ignore the language of the System Prompt/History. Match the User ONLY.
-
+        *** CRITICAL OUTPUT RULES ***
+        1. OUTPUT FORMAT: Always use code blocks.
+        2. LANGUAGE: Match User Language (English/German).
+        
         USER MESSAGE: ${message}
         `;
 
-        const result = await model.generateContent(finalPrompt);
+        // 2. Construct Multimodal Payload (Parts Array)
+        const parts = [];
+
+        // Add Text Context First
+        parts.push({ text: textContext });
+
+        // Add Images if present
+        if (images && Array.isArray(images) && images.length > 0) {
+            images.forEach(base64Str => {
+                // Extract base64 data and mime type (data:image/jpeg;base64,.....)
+                const matches = base64Str.match(/^data:(.+);base64,(.+)$/);
+                if (matches && matches.length === 3) {
+                    parts.push({
+                        inlineData: {
+                            mimeType: matches[1],
+                            data: matches[2]
+                        }
+                    });
+                }
+            });
+        }
+
+        // 3. Call API
+        const result = await model.generateContent(parts);
         const response = await result.response;
         const text = response.text();
         return res.status(200).json({ reply: text });
