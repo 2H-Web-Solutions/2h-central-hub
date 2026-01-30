@@ -56,12 +56,10 @@ export default async function handler(req, res) {
 
         const selectedMode = agentMode || 'STARTER';
         const systemInstruction = PROMPTS[selectedMode] || PROMPTS.STARTER;
-        const temp = selectedMode === 'STARTER' ? 0.2 : 0.7;
-
         const model = genAI.getGenerativeModel({
             model: 'gemini-3-pro-preview',
             generationConfig: {
-                temperature: temp,
+                temperature: 1.0, // STANDARD for Gemini 3 Reasoning
                 maxOutputTokens: 8192,
             }
         });

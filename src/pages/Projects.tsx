@@ -78,13 +78,14 @@ const GLOBAL_RULES = `
    - Server-Side (n8n/Vercel): Use Service Accounts/API Keys stored in Env Vars.
    - Error Handling: Fail gracefully. If n8n doesn't respond, show UI feedback.
 
-6. AI ENGINE STANDARDS (STRICT)
-   - DEFAULT MODEL: Use 'gemini-3-flash-preview' (or 'gemini-3-flash') as the absolute standard for all API calls.
-   - FALLBACK: Only use 'gemini-3-pro-preview' if the user explicitly requests "High Reasoning" or "Complex Logic".
-   - ARCHITECTURE: Use Vercel Serverless Functions ('api/chat.js') for the backend.
-   - MULTIMODAL: The 'api/chat.js' MUST handle the 'images' array using 'inlineData' (Gemini 3 Native Vision).
-   - HISTORY: The API must accept 'history' for context awareness.
-   - SYSTEM PROMPT: Inject the 'Antigravity Operator' persona by default.
+6. AI ENGINE STANDARDS (GEMINI 3 PROTOCOL)
+   - STANDARD MODEL: 'gemini-3-flash-preview'. Use this for 90% of apps (Reports, Dashboards, CRUD). It is fast and cheap.
+   - PRO MODEL: 'gemini-3-pro-preview'. Use ONLY if the app requires:
+     a) Complex Autonomous Agents.
+     b) Deep Reasoning/Coding capabilities.
+     c) Heavy Multimodal Analysis.
+   - IMPLEMENTATION RULE: When building the backend ('api/chat.js') for a new app, the Architect MUST ask: "Shall we use Flash (Speed) or Pro (Reasoning)?" or decide based on complexity.
+   - CONFIGURATION: Always set `temperature: 1.0` for Gemini 3 models.
 
 7. UI/UX MASTER BLUEPRINT (THE "2H SHELL")
       Every app must use this exact layout structure:
