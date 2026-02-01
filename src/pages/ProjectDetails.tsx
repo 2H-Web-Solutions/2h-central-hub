@@ -336,10 +336,16 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
 *** LIVE PROJECT METADATA ***
 - App Name: ${project?.name || project?.type || 'Unknown'}
 - Client: ${project?.clientName || 'Unknown'}
-- GitHub Repo: ${project?.githubUrl || 'Not set'}
-- Vercel URL: ${project?.vercelUrl || 'Not set'}
-- Gemini Key: ${project?.geminiApiKey || 'Pending'}
-- Firebase Config: ${JSON.stringify(project?.firebaseConfig || {}, null, 2)}
+- GitHub Repo: ${githubUrl || 'Not set'}
+- Vercel Deployment: ${vercelUrl || 'Not set'}
+- Gemini API Key: ${geminiApiKey || 'Pending'}
+- Firebase Config:
+  apiKey: ${apiKey || 'Pending'}
+  authDomain: ${authDomain || 'Pending'}
+  projectId: ${fbProjectId || 'Pending'}
+  storageBucket: ${storageBucket || 'Pending'}
+  messagingSenderId: ${messagingSenderId || 'Pending'}
+  appId: ${fbAppId || 'Pending'}
 `;
             const combinedContext = (project?.memory || "") + "\n\n" + metadata;
 
