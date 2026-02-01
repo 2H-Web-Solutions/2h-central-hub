@@ -5,7 +5,7 @@ import { db } from '../lib/firebase';
 import DashboardShell from '../components/DashboardShell';
 import SidebarNav from '../components/SidebarNav';
 import Button from '../components/Button';
-import { Github, Globe, ExternalLink, MessageSquare, Trash2, Lock, Copy, Paperclip, X, Archive, Map, Hammer, Bug, BookOpen, Edit2, Plus, PenSquare } from 'lucide-react';
+import { Github, Globe, ExternalLink, MessageSquare, Trash2, Lock, Copy, Paperclip, X, Archive, Map, Hammer, Bug, BookOpen, Edit2, Plus, PenSquare, Key } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Project {
@@ -15,6 +15,7 @@ interface Project {
     type: string;
     githubUrl?: string;
     vercelUrl?: string;
+    geminiApiKey?: string;
     memory?: string;
     firebaseConfig?: {
         apiKey?: string;
@@ -51,6 +52,7 @@ export default function ProjectDetails() {
     // Form States
     const [githubUrl, setGithubUrl] = useState('');
     const [vercelUrl, setVercelUrl] = useState('');
+    const [geminiApiKey, setGeminiApiKey] = useState('');
     const [memory, setMemory] = useState('');
 
     // Knowledge Base Tabs
@@ -91,6 +93,7 @@ export default function ProjectDetails() {
                 if (document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
                     setGithubUrl(data.githubUrl || '');
                     setVercelUrl(data.vercelUrl || '');
+                    setGeminiApiKey(data.geminiApiKey || '');
                     setMemory(data.memory || '');
 
                     if (data.firebaseConfig) {
@@ -335,6 +338,7 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
 - Client: ${project?.clientName || 'Unknown'}
 - GitHub Repo: ${project?.githubUrl || 'Not set'}
 - Vercel URL: ${project?.vercelUrl || 'Not set'}
+- Gemini Key: ${project?.geminiApiKey || 'Pending'}
 - Firebase Config: ${JSON.stringify(project?.firebaseConfig || {}, null, 2)}
 `;
             const combinedContext = (project?.memory || "") + "\n\n" + metadata;
@@ -527,6 +531,20 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                                 onBlur={() => handleUpdateField('vercelUrl', vercelUrl)}
                             />
                         </div>
+
+                        <div>
+                            <label className="flex items-center gap-2 text-xs font-medium text-gray-500 mb-1">
+                                <Key size={14} /> Gemini API Key (AI Studio)
+                            </label>
+                            <input
+                                type="text"
+                                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none bg-gray-50 font-mono text-xs"
+                                placeholder="AIza..."
+                                value={geminiApiKey}
+                                onChange={(e) => setGeminiApiKey(e.target.value)}
+                                onBlur={() => handleUpdateField('geminiApiKey', geminiApiKey)}
+                            />
+                        </div>
                     </div>
 
                     {/* Firebase Config Card */}
@@ -625,8 +643,8 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                             <button
                                 onClick={() => setKnowledgeTab('timeline')}
                                 className={`pb-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${knowledgeTab === 'timeline'
-                                        ? 'border-brand-lime text-brand-black'
-                                        : 'border-transparent text-gray-400 hover:text-gray-600'
+                                    ? 'border-brand-lime text-brand-black'
+                                    : 'border-transparent text-gray-400 hover:text-gray-600'
                                     }`}
                             >
                                 <BookOpen size={16} /> Timeline
@@ -634,8 +652,8 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                             <button
                                 onClick={() => setKnowledgeTab('editor')}
                                 className={`pb-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${knowledgeTab === 'editor'
-                                        ? 'border-brand-lime text-brand-black'
-                                        : 'border-transparent text-gray-400 hover:text-gray-600'
+                                    ? 'border-brand-lime text-brand-black'
+                                    : 'border-transparent text-gray-400 hover:text-gray-600'
                                     }`}
                             >
                                 <Edit2 size={16} /> Raw Editor
