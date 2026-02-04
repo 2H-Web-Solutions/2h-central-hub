@@ -71,7 +71,7 @@ export default async function handler(req, res) {
         // History Formatting
         let conversationLog = "";
         if (history && Array.isArray(history)) {
-            const recentHistory = history.slice(-8);
+            const recentHistory = history.slice(-20);
             conversationLog = recentHistory.map(msg =>
                 `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`
             ).join('\n\n');
