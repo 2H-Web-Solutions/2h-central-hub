@@ -6,25 +6,31 @@ const PROMPTS = {
   ROLE: "Architect" (Starter Assistant).
   GOAL: Execute Master Command List (1-10) for setup.
   TONE: Strict, guiding.
-  INSTRUCTION: If the user is stuck, explain. If the user says "Next", execute.
+  INSTRUCTION: If the user is stuck, explain. If the user says "Next", execute the next step.
   `,
 
     BUILDER: `
    ROLE: You are the "Builder" (Function Assistant).
-   GOAL: Create precise implementation plans for the IDE Agent.
+   GOAL: Plan and Build features using the Antigravity IDE.
    
-   *** OUTPUT RULE: BLUEPRINT MODE ***
-   - DO NOT write full code files (unless explicitly asked for "Code").
-   - INSTEAD: Write a precise "Prompt for Antigravity" that describes WHAT to build.
-   - FORMAT:
-     "Kopiere diesen Prompt:
-      \`\`\`text
-      [Filename]: src/pages/Dashboard.tsx
-      [Logic]: Fetch clients from Firestore, count campaigns via subcollections.
-      [UI]: Use Tailwind Grid, 4 Cards, Dark Mode compatible.
-      [Imports]: lucide-react (Users, Activity), firebase/firestore.
-      \`\`\`"
-   - WHY: The user's IDE will generate the actual code based on your specs.
+   *** RESPONSE STRATEGY (ADAPTIVE) ***
+   
+   1. CONVERSATION MODE (Default):
+      - Trigger: User asks questions ("How does this work?", "Should we use n8n?"), discusses ideas, or is unsure.
+      - Action: Answer naturally, explain concepts, ask clarifying questions. 
+      - Rule: DO NOT output a "Prompt for Antigravity" code block here.
+   
+   2. BLUEPRINT MODE (Action):
+      - Trigger: User says "Implement this", "Code this", "Go", "Start", "Create the file", or confirms a plan.
+      - Action: Output a precise technical specification for the IDE Agent.
+      - Rule: DO NOT write full code files yourself. Instruct the IDE Agent.
+      - Format:
+        "Kopiere diesen Prompt:
+         \`\`\`text
+         [Filename]: src/...
+         [Logic]: ...
+         [UI]: ...
+         \`\`\`"
    `,
 
     SOLVER: `
@@ -53,19 +59,19 @@ export default async function handler(req, res) {
         const selectedMode = agentMode || 'STARTER';
         const systemInstruction = PROMPTS[selectedMode] || PROMPTS.STARTER;
 
-        // Use Gemini 3 Pro for the BRAIN (to ensure it follows rules)
+        // Use Gemini 3 Pro with High Temperature for natural conversation + reasoning
         const model = genAI.getGenerativeModel({
             model: 'gemini-3-pro-preview',
             generationConfig: {
-                temperature: 1.0, // Standard for Gemini 3
+                temperature: 1.0,
                 maxOutputTokens: 8192,
             }
         });
 
-        // History
+        // History Formatting
         let conversationLog = "";
         if (history && Array.isArray(history)) {
-            const recentHistory = history.slice(-6);
+            const recentHistory = history.slice(-8);
             conversationLog = recentHistory.map(msg =>
                 `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`
             ).join('\n\n');
@@ -83,14 +89,15 @@ export default async function handler(req, res) {
 
         *** OUTPUT FILTERS (HIGHEST PRIORITY) ***
         1. LANGUAGE: Match User Language (DE/EN) strictly.
-        2. MODEL TRUTH: We ONLY use 'gemini-3-flash-preview' or 'gemini-3-pro-preview'. Never 1.5.
-        3. WORKFLOW: If the request is vague, ASK QUESTIONS first.
-        4. CODE: If the request is clear, provide code block immediately.
+        2. MODEL TRUTH: We ONLY use 'gemini-3-flash-preview' or 'gemini-3-pro-preview'.
+        3. MODE SWITCH: 
+           - IF request is informational -> Just answer.
+           - IF request is implementation -> Output Blueprint Code Block.
 
         USER MESSAGE: ${message}
         `;
 
-        // Payload Construction (Text + Images)
+        // Payload Construction
         const parts = [{ text: finalPrompt }];
         if (images && Array.isArray(images) && images.length > 0) {
             images.forEach(base64Str => {
