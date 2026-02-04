@@ -41,6 +41,7 @@ interface parsedLog {
     title: string;
     date: string;
     content: string;
+    raw: string;
 }
 
 export default function ProjectDetails() {
@@ -58,9 +59,11 @@ export default function ProjectDetails() {
     // Knowledge Base Tabs
     const [knowledgeTab, setKnowledgeTab] = useState<'timeline' | 'editor'>('timeline');
     const [parsedLogs, setParsedLogs] = useState<parsedLog[]>([]);
-    const [isAddingNote, setIsAddingNote] = useState(false);
-    const [newNoteTitle, setNewNoteTitle] = useState('');
-    const [newNoteContent, setNewNoteContent] = useState('');
+
+    // Note State
+    const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
+    const [noteTitle, setNoteTitle] = useState('');
+    const [noteContent, setNoteContent] = useState('');
 
 
     // Firebase Config Form States
@@ -153,10 +156,14 @@ export default function ProjectDetails() {
 
             if (!chunk.trim()) return null; // skip empty chunks
 
+            // Store raw content WITHOUT the leading ## for reconstruction
+            const raw = chunk.replace(/^## /, '');
+
             return {
                 title: cleanTitle || "Untitled Log",
                 date: date,
-                content: content
+                content: content,
+                raw: raw
             };
         }).filter(log => log !== null) as parsedLog[];
     };
@@ -192,10 +199,10 @@ export default function ProjectDetails() {
     };
 
     const handleAddNote = async () => {
-        if (!newNoteTitle.trim() || !newNoteContent.trim() || !projectId) return;
+        if (!noteTitle.trim() || !noteContent.trim() || !projectId) return;
 
         const dateStr = new Date().toISOString().split('T')[0];
-        const newLogEntry = `## ${newNoteTitle} - ${dateStr}\n\n${newNoteContent}`;
+        const newLogEntry = `## ${noteTitle} - ${dateStr}\n${noteContent}`;
 
         const newMemory = (newLogEntry + "\n\n" + (project?.memory || "")).trim();
 
@@ -203,10 +210,25 @@ export default function ProjectDetails() {
         await handleUpdateField('memory', newMemory);
 
         // Reset Form
-        setNewNoteTitle('');
-        setNewNoteContent('');
-        setIsAddingNote(false);
+        setNoteTitle('');
+        setNoteContent('');
+        setIsNoteModalOpen(false);
         toast.success("Note added to timeline");
+    };
+
+    const handleDeleteEntry = async (index: number) => {
+        if (!project?.memory || !projectId) return;
+
+        if (!window.confirm("Are you sure you want to delete this log entry?")) return;
+
+        // Use the parsed logs to reconstruct, skipping the deleted index
+        const updatedLogs = parsedLogs.filter((_, i) => i !== index);
+
+        // Reconstruct: Add "## " back to the raw content
+        const newMemory = updatedLogs.map(log => "## " + log.raw).join("\n\n").trim();
+
+        await handleUpdateField('memory', newMemory);
+        toast.success("Entry deleted");
     };
 
 
@@ -675,7 +697,7 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                                 <div className="p-4 border-b border-gray-50 flex justify-between items-center bg-gray-50/30">
                                     <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Logbook Entries</span>
                                     <button
-                                        onClick={() => setIsAddingNote(!isAddingNote)}
+                                        onClick={() => setIsNoteModalOpen(true)}
                                         className="bg-brand-black text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-gray-800 transition-colors shadow-sm"
                                     >
                                         <Plus size={14} /> Add Note
@@ -683,34 +705,61 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                                 </div>
 
                                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                                    {/* Add Note Form */}
-                                    {isAddingNote && (
-                                        <div className="bg-brand-lime/10 border border-brand-lime/30 p-4 rounded-xl mb-4 animate-in fade-in slide-in-from-top-4">
-                                            <div className="flex justify-between items-center mb-3">
-                                                <h4 className="text-sm font-bold text-brand-black flex items-center gap-2">
-                                                    <PenSquare size={16} /> New Entry
-                                                </h4>
-                                                <button onClick={() => setIsAddingNote(false)} className="text-gray-400 hover:text-gray-600">
-                                                    <X size={16} />
-                                                </button>
-                                            </div>
-                                            <input
-                                                type="text"
-                                                className="w-full mb-3 px-3 py-2 rounded-lg border border-brand-lime/30 text-sm focus:ring-1 focus:ring-brand-lime outline-none bg-white font-bold"
-                                                placeholder="Title (e.g., Feature Update)"
-                                                value={newNoteTitle}
-                                                onChange={(e) => setNewNoteTitle(e.target.value)}
-                                            />
-                                            <textarea
-                                                className="w-full mb-3 px-3 py-2 rounded-lg border border-brand-lime/30 text-sm focus:ring-1 focus:ring-brand-lime outline-none bg-white min-h-[100px] resize-none"
-                                                placeholder="What happened?"
-                                                value={newNoteContent}
-                                                onChange={(e) => setNewNoteContent(e.target.value)}
-                                            />
-                                            <div className="flex justify-end">
-                                                <Button onClick={handleAddNote} disabled={!newNoteTitle || !newNoteContent}>
-                                                    Save Entry
-                                                </Button>
+                                    {/* Modal for Adding Note */}
+                                    {isNoteModalOpen && (
+                                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                                            <div className="bg-white w-full max-w-lg rounded-xl shadow-2xl overflow-hidden border border-gray-100 animate-in zoom-in-95 duration-200">
+                                                {/* Modal Header */}
+                                                <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                                                    <h3 className="font-bold text-lg text-brand-black flex items-center gap-2">
+                                                        <PenSquare size={18} className="text-brand-lime" />
+                                                        Add Knowledge Entry
+                                                    </h3>
+                                                    <button
+                                                        onClick={() => setIsNoteModalOpen(false)}
+                                                        className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full hover:bg-gray-100"
+                                                    >
+                                                        <X size={20} />
+                                                    </button>
+                                                </div>
+
+                                                {/* Modal Body */}
+                                                <div className="p-6 space-y-4">
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Entry Title</label>
+                                                        <input
+                                                            type="text"
+                                                            className="w-full px-4 py-2.5 rounded-lg border border-gray-200 text-sm font-bold text-gray-800 focus:border-brand-lime focus:ring-2 focus:ring-brand-lime/20 outline-none bg-white transition-all"
+                                                            placeholder="e.g. Database Schema Update"
+                                                            value={noteTitle}
+                                                            onChange={(e) => setNoteTitle(e.target.value)}
+                                                            autoFocus
+                                                        />
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Entry Content</label>
+                                                        <textarea
+                                                            className="w-full px-4 py-3 rounded-lg border border-gray-200 text-sm focus:border-brand-lime focus:ring-2 focus:ring-brand-lime/20 outline-none bg-white min-h-[150px] resize-none leading-relaxed"
+                                                            placeholder="Describe the update, decision, or feature..."
+                                                            value={noteContent}
+                                                            onChange={(e) => setNoteContent(e.target.value)}
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                {/* Modal Footer */}
+                                                <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t border-gray-100">
+                                                    <button
+                                                        onClick={() => setIsNoteModalOpen(false)}
+                                                        className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                    <Button onClick={handleAddNote} disabled={!noteTitle.trim() || !noteContent.trim()}>
+                                                        Save Entry
+                                                    </Button>
+                                                </div>
                                             </div>
                                         </div>
                                     )}
@@ -728,7 +777,20 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                                                         <div className="w-1.5 h-1.5 rounded-full bg-brand-lime group-open:scale-125 transition-transform"></div>
                                                         <span className="font-bold">{log.title}</span>
                                                     </div>
-                                                    <span className="text-xs font-mono text-gray-400 bg-white px-2 py-1 rounded border border-gray-100">{log.date}</span>
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-xs font-mono text-gray-400 bg-white px-2 py-1 rounded border border-gray-100">{log.date}</span>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                                handleDeleteEntry(idx);
+                                                            }}
+                                                            className="text-gray-300 hover:text-red-500 transition-colors p-1"
+                                                            title="Delete Entry"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
                                                 </summary>
                                                 <div className="px-4 pb-4 pt-0 text-sm text-gray-600 whitespace-pre-wrap leading-relaxed pl-8 border-t border-gray-50 mt-2">
                                                     {log.content}
