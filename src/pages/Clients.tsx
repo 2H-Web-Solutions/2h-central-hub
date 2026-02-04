@@ -5,7 +5,9 @@ import Button from '../components/Button';
 import DashboardShell from '../components/DashboardShell';
 import SidebarNav from '../components/SidebarNav';
 import SecureDeleteModal from '../components/SecureDeleteModal';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, Sparkles, Loader2 } from 'lucide-react';
+import { refineBrandInfo } from '../lib/gemini';
+import toast from 'react-hot-toast';
 
 interface Client {
     id: string;
@@ -42,6 +44,10 @@ export default function Clients() {
     const [fontHeading, setFontHeading] = useState('Federo');
     const [fontBody, setFontBody] = useState('Barlow');
 
+    // AI Fix State
+    const [isFixing, setIsFixing] = useState(false);
+    const [fixInstruction, setFixInstruction] = useState('');
+
     // Subscribe to Clients
     useEffect(() => {
         const q = query(
@@ -70,6 +76,7 @@ export default function Clients() {
         setSurfaceColor('#ffffff');
         setFontHeading('Federo');
         setFontBody('Barlow');
+        setFixInstruction('');
         setEditingClient(null);
     };
 
@@ -133,6 +140,42 @@ export default function Clients() {
         } catch (error) {
             console.error("Error deleting client: ", error);
             alert("Failed to delete client");
+        }
+    };
+
+    const handleAutoFix = async () => {
+        if (!fixInstruction.trim()) {
+            toast.error("Please enter an instruction for the AI.");
+            return;
+        }
+
+        setIsFixing(true);
+        try {
+            const currentData = {
+                companyName,
+                website,
+                primaryColor,
+                backgroundColor,
+                surfaceColor,
+                fontHeading,
+                fontBody
+            };
+
+            const refinedData = await refineBrandInfo(currentData, fixInstruction);
+
+            if (refinedData.primaryColor) setPrimaryColor(refinedData.primaryColor);
+            if (refinedData.backgroundColor) setBackgroundColor(refinedData.backgroundColor);
+            if (refinedData.surfaceColor) setSurfaceColor(refinedData.surfaceColor);
+            if (refinedData.fontHeading) setFontHeading(refinedData.fontHeading);
+            if (refinedData.fontBody) setFontBody(refinedData.fontBody);
+
+            toast.success("AI updated the fields based on your feedback!");
+            setFixInstruction(''); // Clear instruction after success
+        } catch (error) {
+            console.error(error);
+            toast.error("AI Fix failed. Please try again.");
+        } finally {
+            setIsFixing(false);
         }
     };
 
@@ -258,8 +301,42 @@ export default function Clients() {
                             </div>
 
                             {/* Brand DNA */}
+                            {/* Brand DNA */}
                             <div className="space-y-4">
-                                <h4 className="text-sm font-bold text-gray-900 border-b pb-2">Brand Identity (DNA)</h4>
+                                <div className="flex justify-between items-center border-b pb-2">
+                                    <h4 className="text-sm font-bold text-gray-900">Brand Identity (DNA)</h4>
+                                </div>
+
+                                {/* AI Magic Fix */}
+                                <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-100 mb-4">
+                                    <label className="block text-xs font-bold text-indigo-700 mb-2 flex items-center gap-1">
+                                        <Sparkles size={12} />
+                                        AI Magic Fix
+                                    </label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            className="flex-1 px-3 py-2 rounded-lg border border-indigo-200 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all bg-white text-brand-black placeholder-indigo-300"
+                                            placeholder="e.g. 'Make it look like a luxury hotel'"
+                                            value={fixInstruction}
+                                            onChange={(e) => setFixInstruction(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    handleAutoFix();
+                                                }
+                                            }}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleAutoFix}
+                                            disabled={isFixing || !fixInstruction.trim()}
+                                            className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                        >
+                                            {isFixing ? <Loader2 size={16} className="animate-spin" /> : 'Fix'}
+                                        </button>
+                                    </div>
+                                </div>
 
                                 {/* Colors */}
                                 <div className="grid grid-cols-3 gap-3">

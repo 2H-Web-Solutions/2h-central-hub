@@ -43,3 +43,35 @@ export const geminiService = {
         }
     }
 };
+
+/**
+ * Refines brand information based on user instructions using AI.
+ * @param currentData The current brand data (JSON object)
+ * @param instruction The user's instruction for refinement
+ * @returns The updated brand data as a JSON object
+ */
+export const refineBrandInfo = async (currentData: any, instruction: string) => {
+    const prompt = `
+      SYSTEM: You are an AI editor. You will receive a JSON object describing a business and a user correction instruction.
+      GOAL: Update the JSON fields strictly following the user instruction. Keep the tone professional. Return ONLY the valid JSON.
+      
+      INPUT DATA:
+      ${JSON.stringify(currentData, null, 2)}
+      
+      USER INSTRUCTION:
+      "${instruction}"
+      
+      OUTPUT:
+      Return ONLY the raw JSON string. No markdown formatting.
+    `;
+
+    try {
+        const result = await geminiService.generateContent(prompt);
+        // Clean up markdown code blocks if present
+        const cleanJson = result.replace(/```json/g, '').replace(/```/g, '').trim();
+        return JSON.parse(cleanJson);
+    } catch (error) {
+        console.error("AI Refinement Error:", error);
+        throw new Error("Failed to refine data.");
+    }
+};
