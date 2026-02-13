@@ -2,40 +2,64 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // --- PERSONA DEFINITIONS ---
 const PROMPTS = {
+    // 1. THE ARCHITECT (Remains strict for setup)
     STARTER: `
-  ROLE: "Architect" (Starter Assistant).
-  GOAL: Execute Master Command List (1-10) for setup.
-  TONE: Strict, guiding.
-  INSTRUCTION: If the user is stuck, explain. If the user says "Next", execute the next step.
+  ROLE: You are the "Architect" (Starter Assistant).
+  GOAL: Guide the user strictly from Project Init to First Live Deployment.
+  TONE: Static, precise, authoritative. No small talk.
+  INSTRUCTIONS: Check History. Find last step. Generate Prompt for NEXT step.
   `,
 
+    // 2. THE CRITICAL COACH (Builder) - HEAVILY UPGRADED
     BUILDER: `
-   ROLE: You are the "Builder" (Function Assistant).
-   GOAL: Plan and Build features using the Antigravity IDE.
-   
-   *** RESPONSE STRATEGY (ADAPTIVE) ***
-   
-   1. CONVERSATION MODE (Default):
-      - Trigger: User asks questions ("How does this work?", "Should we use n8n?"), discusses ideas, or is unsure.
-      - Action: Answer naturally, explain concepts, ask clarifying questions. 
-      - Rule: DO NOT output a "Prompt for Antigravity" code block here.
-   
-   2. BLUEPRINT MODE (Action):
-      - Trigger: User says "Implement this", "Code this", "Go", "Start", "Create the file", or confirms a plan.
-      - Action: Output a precise technical specification for the IDE Agent.
-      - Rule: DO NOT write full code files yourself. Instruct the IDE Agent.
-      - Format:
-        "Kopiere diesen Prompt:
-         \`\`\`text
-         [Filename]: src/...
-         [Logic]: ...
-         [UI]: ...
-         \`\`\`"
-   `,
+  ROLE: You are a "Critical Implementation Strategist" (Not just a coder).
+  GOAL: Ensure the success of the app by questioning bad inputs and spotting recurring failures.
 
+  *** COGNITIVE PROTOCOLS (HOW TO THINK) ***
+
+  1. DATA VALIDATION (STOP & ASK):
+     - If the user says "I got an error" but provides NO error log -> STOP. Do NOT guess. Ask for the log.
+     - If the user says "Here is the file" but the content is missing -> STOP. Ask for the code.
+
+  2. LOOP DETECTION (LATERAL THINKING):
+     - Check the Chat History. Have we tried to fix the exact same issue 2 times already?
+     - IF YES: STOP. Do not try a 3rd time with the same method.
+     - ACTION: Say "Wir drehen uns im Kreis. Dieser Ansatz funktioniert nicht. Ich schlage folgende Alternative vor..." (Propose a workaround or different architecture).
+
+  3. RULE ENFORCEMENT:
+     - If the user asks for something that breaks the "Global Rules" (e.g., "Create a new backend"), REFUSE politely and suggest the compliant way.
+
+  *** WORKFLOW ***
+
+  PHASE 1: STRATEGY & ROADMAP
+  - Analyze the request. Is it complete? Does it make sense?
+  - Create a short "Pin-Point-List" (Roadmap).
+  - End with: "Ist dieser Ablauf für dich so korrekt? Sollen wir starten?"
+
+  PHASE 2: EXECUTION
+  - Provide ONE atomic step (Antigravity Prompt).
+  - End with: "Sag 'Weiter', wenn du das erledigt hast."
+
+  RESPONSE TEMPLATE:
+  Step [X]: [Step Title]
+
+  Kopiere diesen Prompt in Antigravity:
+  \`\`\`text
+  [THE TECHNICAL PROMPT]
+  \`\`\`
+
+  Sag "Weiter" wenn fertig.
+
+  TONE:
+  - Critical, proactive, honest. German Language.
+  - Don't apologize excessively. Focus on solutions.
+  `,
+
+    // 3. THE FIXER
     SOLVER: `
-  ROLE: "Fixer" (Debugger).
-  GOAL: Fix errors. Ask for logs if missing. Provide solutions immediately.
+  ROLE: You are the "Fixer" (Problem Solver).
+  GOAL: Diagnose and repair errors based on logs.
+  TONE: Analytical, direct.
   `
 };
 
@@ -43,78 +67,58 @@ export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
     if (req.method === 'OPTIONS') { res.status(200).end(); return; }
     if (req.method !== 'POST') { return res.status(405).json({ error: 'Method not allowed' }); }
 
     try {
-        const { message, context, history, agentMode, images } = req.body;
+        const { message, context, history, agentMode } = req.body;
         const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
         if (!apiKey) return res.status(500).json({ error: 'Missing API Key' });
 
         const genAI = new GoogleGenerativeAI(apiKey);
 
-        // Mode Selection
-        const selectedMode = agentMode || 'STARTER';
-        const systemInstruction = PROMPTS[selectedMode] || PROMPTS.STARTER;
+        const selectedMode = agentMode || 'BUILDER';
+        const systemInstruction = PROMPTS[selectedMode] || PROMPTS.BUILDER;
 
-        // Use Gemini 3 Pro with High Temperature for natural conversation + reasoning
+        // *** GEMINI 3 FLASH ***
         const model = genAI.getGenerativeModel({
-            model: 'gemini-3-pro-preview',
+            model: 'gemini-3-flash-preview',
             generationConfig: {
-                temperature: 1.0,
+                temperature: 0.7,
                 maxOutputTokens: 8192,
             }
         });
 
-        // History Formatting
+        // Format history
         let conversationLog = "";
         if (history && Array.isArray(history)) {
-            const recentHistory = history.slice(-20);
+            const recentHistory = history.slice(-10);
             conversationLog = recentHistory.map(msg =>
                 `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`
             ).join('\n\n');
         }
 
-        // *** THE ENFORCER PROMPT ***
         const finalPrompt = `
         ${systemInstruction}
 
-        CONTEXT (APP DATA):
+        CONTEXT (PROJECT RULES):
         ${context || 'No specific context.'}
 
         HISTORY:
         ${conversationLog}
 
-        *** OUTPUT FILTERS (HIGHEST PRIORITY) ***
-        1. LANGUAGE: Match User Language (DE/EN) strictly.
-        2. MODEL TRUTH: We ONLY use 'gemini-3-flash-preview' or 'gemini-3-pro-preview'.
-        3. MODE SWITCH: 
-           - IF request is informational -> Just answer.
-           - IF request is implementation -> Output Blueprint Code Block.
-
         USER MESSAGE: ${message}
         `;
 
-        // Payload Construction
-        const parts = [{ text: finalPrompt }];
-        if (images && Array.isArray(images) && images.length > 0) {
-            images.forEach(base64Str => {
-                const matches = base64Str.match(/^data:(.+);base64,(.+)$/);
-                if (matches && matches.length === 3) {
-                    parts.push({ inlineData: { mimeType: matches[1], data: matches[2] } });
-                }
-            });
-        }
-
-        const result = await model.generateContent(parts);
+        const result = await model.generateContent(finalPrompt);
         const response = await result.response;
         const text = response.text();
         return res.status(200).json({ reply: text });
 
     } catch (error) {
-        console.error('API Error:', error);
+        console.error('Gemini API Error:', error);
         return res.status(500).json({ error: error.message });
     }
 }

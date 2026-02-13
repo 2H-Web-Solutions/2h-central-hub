@@ -5,7 +5,8 @@ import { db } from '../lib/firebase';
 import DashboardShell from '../components/DashboardShell';
 import SidebarNav from '../components/SidebarNav';
 import Button from '../components/Button';
-import { Github, Globe, ExternalLink, MessageSquare, Trash2, Lock, Copy, Paperclip, X, Archive, Map, Hammer, Bug, BookOpen, Edit2, Plus, PenSquare, Key } from 'lucide-react';
+import { Github, Globe, ExternalLink, MessageSquare, Trash2, Lock, Copy, Paperclip, X, Archive, Map, Hammer, Bug, BookOpen, Edit2, Plus, PenSquare, Key, Check } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import toast from 'react-hot-toast';
 
 interface Project {
@@ -43,6 +44,36 @@ interface parsedLog {
     content: string;
     raw: string;
 }
+
+const CodeBlock = ({ language, children }: { language: string, children: string }) => {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText(children);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    return (
+        <div className="rounded-md overflow-hidden my-3 border border-gray-200 bg-white shadow-sm">
+            <div className="flex justify-between items-center bg-gray-50 px-3 py-1.5 border-b border-gray-100">
+                <span className="text-[10px] font-mono font-bold text-gray-500 uppercase tracking-wider">{language}</span>
+                <button
+                    onClick={handleCopy}
+                    className="flex items-center gap-1.5 text-[10px] uppercase font-bold text-gray-400 hover:text-brand-black transition-colors"
+                >
+                    {copied ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                    {copied ? 'Copied' : 'Copy'}
+                </button>
+            </div>
+            <pre className="bg-gray-50/50 p-3 overflow-x-auto text-xs font-mono leading-relaxed text-gray-700">
+                <code className={`language-${language}`}>
+                    {children}
+                </code>
+            </pre>
+        </div>
+    );
+};
 
 export default function ProjectDetails() {
     const { projectId } = useParams();
@@ -920,7 +951,29 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                                             ))}
                                         </div>
                                     )}
-                                    {msg.content}
+                                    <ReactMarkdown
+                                        components={{
+                                            code(props) {
+                                                const { children, className, node, ...rest } = props;
+                                                const match = /language-(\w+)/.exec(className || '');
+                                                return match ? (
+                                                    <CodeBlock language={match[1]}>{String(children).replace(/\n$/, '')}</CodeBlock>
+                                                ) : (
+                                                    <code className="bg-black/5 px-1 py-0.5 rounded font-mono text-[0.9em] text-brand-black/80" {...rest}>
+                                                        {children}
+                                                    </code>
+                                                );
+                                            },
+                                            // Style other markdown elements to match the chat look
+                                            p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                                            ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
+                                            ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
+                                            li: ({ children }) => <li>{children}</li>,
+                                            a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline hover:text-blue-800">{children}</a>
+                                        }}
+                                    >
+                                        {msg.content}
+                                    </ReactMarkdown>
                                 </div>
                             </div>
                         ))}
