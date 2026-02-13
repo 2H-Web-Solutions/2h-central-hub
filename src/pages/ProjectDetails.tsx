@@ -46,12 +46,41 @@ interface parsedLog {
 }
 
 const CodeBlock = ({ language, children }: { language: string, children: string }) => {
-    const [copied, setCopied] = useState(false);
+    const [isCopied, setIsCopied] = useState(false);
 
-    const handleCopy = () => {
-        navigator.clipboard.writeText(children);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+    const handleCopy = async () => {
+        // 1. Extract clean text
+        const textToCopy = String(children).replace(/\n$/, '');
+
+        try {
+            // 2. Try Modern API
+            await navigator.clipboard.writeText(textToCopy);
+            setIsCopied(true);
+        } catch (err) {
+            console.warn('Clipboard API failed, trying fallback...', err);
+
+            // 3. Fallback: Old School "TextArea Hack" (Works everywhere)
+            try {
+                const textArea = document.createElement("textarea");
+                textArea.value = textToCopy;
+
+                // Ensure it's not visible but part of DOM
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                document.body.appendChild(textArea);
+
+                textArea.select();
+                document.execCommand("copy");
+                document.body.removeChild(textArea);
+
+                setIsCopied(true);
+            } catch (fallbackErr) {
+                console.error('Copy failed completely:', fallbackErr);
+                alert("Copy failed. Please select text manually.");
+            }
+        }
+
+        setTimeout(() => setIsCopied(false), 2000);
     };
 
     return (
@@ -62,8 +91,8 @@ const CodeBlock = ({ language, children }: { language: string, children: string 
                     onClick={handleCopy}
                     className="flex items-center gap-1.5 text-[10px] uppercase font-bold text-gray-400 hover:text-brand-black transition-colors"
                 >
-                    {copied ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
-                    {copied ? 'Copied' : 'Copy'}
+                    {isCopied ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                    {isCopied ? 'Copied' : 'Copy'}
                 </button>
             </div>
             <pre className="bg-gray-50/50 p-3 overflow-x-auto text-xs font-mono leading-relaxed text-gray-700">
