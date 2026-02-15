@@ -138,7 +138,7 @@ export default function ProjectDetails() {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [chatInput, setChatInput] = useState('');
     const [isThinking, setIsThinking] = useState(false);
-    const [agentMode, setAgentMode] = useState<'STARTER' | 'BUILDER' | 'SOLVER'>('STARTER');
+    const [agentMode, setAgentMode] = useState<'STARTER' | 'BUILDER' | 'SOLVER'>('BUILDER');
     const [attachments, setAttachments] = useState<string[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -725,7 +725,7 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                     </div>
 
                     {/* Persistent Memory / Knowledge Timeline */}
-                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm flex-1 flex flex-col overflow-hidden">
+                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm flex-1 flex flex-col overflow-hidden min-h-[600px]">
                         {/* Tabs Header */}
                         <div className="flex border-b border-gray-100 px-6 pt-4 pb-0 gap-6">
                             <button
