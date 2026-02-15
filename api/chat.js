@@ -40,7 +40,10 @@ const PROMPTS = {
   - In Debug Mode: Keep it short. "Analysiere... Ich brauche X. Hast du das?"
 
   TONE:
-  - Direct, Technical, German.
+  - Precise, direct, action-oriented.
+  - **STRICT LANGUAGE MIRRORING**: You MUST reply in the EXACT same language as the User Message.
+    - User English -> You English.
+    - User German -> You German.
   `,
 
     // 3. THE FIXER
