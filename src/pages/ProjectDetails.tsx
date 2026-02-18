@@ -5,7 +5,7 @@ import { db } from '../lib/firebase';
 import DashboardShell from '../components/DashboardShell';
 import SidebarNav from '../components/SidebarNav';
 import Button from '../components/Button';
-import { Github, Globe, ExternalLink, MessageSquare, Trash2, Lock, Copy, Paperclip, X, Archive, Map, Hammer, Bug, BookOpen, Edit2, Plus, PenSquare, Key, Check } from 'lucide-react';
+import { Github, Globe, ExternalLink, MessageSquare, Trash2, Lock, Copy, Paperclip, X, Archive, Map, Hammer, Bug, BookOpen, Edit2, Plus, PenSquare, Key, Check, Sparkles } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import toast from 'react-hot-toast';
 
@@ -28,6 +28,7 @@ interface Project {
     };
     agentMode?: 'STARTER' | 'BUILDER' | 'SOLVER';
     name?: string;
+    aiModel?: string;
 }
 
 interface ChatMessage {
@@ -439,6 +440,7 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                     context: combinedContext,
                     agent: "Builder",
                     agentMode: agentMode,
+                    aiModel: project?.aiModel || 'gemini-3-flash-preview',
                     history: messages.map(m => ({ role: m.role, content: m.content })),
                     // NOTE: Real multimodal support would require sending the Base64 in a specific format to the API. 
                     // For now, we assume text-based context or that the API ignores images if not supported.
@@ -632,6 +634,20 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                                 onChange={(e) => setGeminiApiKey(e.target.value)}
                                 onBlur={() => handleUpdateField('geminiApiKey', geminiApiKey)}
                             />
+                        </div>
+
+                        <div>
+                            <label className="flex items-center gap-2 text-xs font-medium text-gray-500 mb-1">
+                                <Sparkles size={14} /> AI Brain Engine
+                            </label>
+                            <select
+                                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none bg-gray-50 font-mono text-xs"
+                                value={project?.aiModel || 'gemini-3-flash-preview'}
+                                onChange={(e) => handleUpdateField('aiModel', e.target.value)}
+                            >
+                                <option value="gemini-3-flash-preview">⚡ Gemini 3 Flash (Standard)</option>
+                                <option value="gemini-3-pro-preview">🧠 Gemini 3 Pro (Smart)</option>
+                            </select>
                         </div>
                     </div>
 

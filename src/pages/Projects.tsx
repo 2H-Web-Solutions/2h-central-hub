@@ -154,6 +154,7 @@ export default function Projects() {
     const [appType, setAppType] = useState('Custom App');
     const [version, setVersion] = useState('v1');
     const [includeTasks, setIncludeTasks] = useState(true);
+    const [aiModel, setAiModel] = useState('gemini-3-flash-preview'); // NEW: AI Model State
     const [generatedPrompt, setGeneratedPrompt] = useState('');
 
     // Firebase Config State
@@ -257,6 +258,7 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
         setAppType('Custom App');
         setVersion('v1');
         setIncludeTasks(true);
+        setAiModel('gemini-3-flash-preview'); // RESET MODEL
 
         setFbApiKey('');
         setFbAuthDomain('');
@@ -287,6 +289,7 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
                 type: appType,
                 name: appName || appType,
                 includeTasks: includeTasks,
+                aiModel: aiModel, // SAVED: AI Brain Engine
                 createdAt: serverTimestamp(),
                 memory: fullSystemContext,
                 firebaseConfig: {
@@ -381,10 +384,6 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
         }
     };
 
-    const copyToClipboard = () => {
-        navigator.clipboard.writeText(generatedPrompt);
-        alert("Prompt copied to clipboard!");
-    };
 
     // FILTER LOGIC
     // 1. Folders: Only show folders for this client
