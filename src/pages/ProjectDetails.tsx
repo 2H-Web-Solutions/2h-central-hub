@@ -444,6 +444,7 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                     agentMode: agentMode,
                     aiModel: project?.aiModel || 'gemini-3-flash-preview',
                     history: messages.map(m => ({ role: m.role, content: m.content })),
+                    repoUrl: githubUrl || null,
                     // NOTE: Real multimodal support would require sending the Base64 in a specific format to the API. 
                     // For now, we assume text-based context or that the API ignores images if not supported.
                     // If you want actual Vision capabilities, you'd insert the image data here.

@@ -67,6 +67,69 @@ const PROMPTS = {
   `
 };
 
+// --- TOOL DEFINITIONS ---
+const tools = [
+  {
+    functionDeclarations: [
+      {
+        name: "read_github_file",
+        description: "Reads the raw content of a file from the connected GitHub repository. Use this to read code files, config files, or documentation to understand the project state.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            filePath: {
+              type: "STRING",
+              description: "The full path to the file in the repository (e.g., 'src/App.tsx' or 'package.json')."
+            }
+          },
+          required: ["filePath"]
+        }
+      }
+    ]
+  }
+];
+
+// --- HELPER FUNCTIONS ---
+const fetchGithubFile = async (repoUrl, filePath) => {
+  try {
+    if (!repoUrl) return "Error: No repository URL provided.";
+
+    // Extract owner/repo
+    // Supports: https://github.com/owner/repo
+    // Supports: https://github.com/owner/repo.git
+    const match = repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+    if (!match) return "Error: Invalid GitHub URL format.";
+
+    const owner = match[1];
+    let repo = match[2];
+    if (repo.endsWith('.git')) repo = repo.slice(0, -4);
+
+    const token = process.env.GITHUB_ACCESS_TOKEN;
+    if (!token) return "Error: Server missing GITHUB_ACCESS_TOKEN env var.";
+
+    const url = `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}`;
+
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github.v3.raw', // Get raw content directly
+        'User-Agent': '2H-Central-Hub-Agent'
+      }
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) return `Error: File '${filePath}' not found in repository.`;
+      return `Error: GitHub API responded with ${response.status} ${response.statusText}`;
+    }
+
+    const text = await response.text();
+    return text;
+  } catch (error) {
+    return `Error fetching file: ${error.message}`;
+  }
+};
+
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -77,38 +140,15 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') { return res.status(405).json({ error: 'Method not allowed' }); }
 
   try {
-    const { message, context, history, agentMode, aiModel } = req.body;
+    const { message, context, history, agentMode, aiModel, repoUrl } = req.body;
     const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
     if (!apiKey) return res.status(500).json({ error: 'Missing API Key' });
 
     const genAI = new GoogleGenerativeAI(apiKey);
 
     const selectedMode = agentMode || 'BUILDER';
-    const systemInstruction = PROMPTS[selectedMode] || PROMPTS.BUILDER;
 
-    // *** GEMINI 3 STRICT MODEL SELECTION ***
-    // Default to Flash if invalid or missing
-    const allowedModels = ['gemini-3-flash-preview', 'gemini-3-pro-preview'];
-    const selectedModel = allowedModels.includes(aiModel) ? aiModel : 'gemini-3-flash-preview';
-
-    const model = genAI.getGenerativeModel({
-      model: selectedModel,
-      generationConfig: {
-        temperature: 1.0, // Gemini 3 Standard
-        maxOutputTokens: 8192,
-        // thinking_config: { thinking_level: "high" } // Uncomment if SDK supports it, otherwise it defaults to high
-      }
-    });
-
-    // Format history
-    let conversationLog = "";
-    if (history && Array.isArray(history)) {
-      const recentHistory = history.slice(-10);
-      conversationLog = recentHistory.map(msg =>
-        `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`
-      ).join('\n\n');
-    }
-
+    // Construct System Instruction including Context
     const UNIVERSAL_TRUTH = `
     *** UNIVERSAL FACTS (OVERRIDE ALL HISTORY) ***
     - Current Date: ${new Date().toISOString()}
@@ -117,24 +157,79 @@ export default async function handler(req, res) {
     - If history says "Gemini 3 not found", IT IS WRONG. Correct it immediately.
     `;
 
-    const finalPrompt = `
-        ${systemInstruction}
-
+    const systemInstruction = `
+        ${PROMPTS[selectedMode] || PROMPTS.BUILDER}
         ${UNIVERSAL_TRUTH}
 
-        CONTEXT (PROJECT RULES):
+        CONTEXT (PROJECT RULES & DATA):
         ${context || 'No specific context.'}
 
-        HISTORY:
-        ${conversationLog}
+        NOTE: You have access to tools. If you need to read a file from the repository to answer the user's request, USE THE TOOL 'read_github_file'. don't guess.
+    `;
 
-        USER MESSAGE: ${message}
-        `;
+    // *** GEMINI 3 STRICT MODEL SELECTION ***
+    const allowedModels = ['gemini-3-flash-preview', 'gemini-3-pro-preview'];
+    const selectedModel = allowedModels.includes(aiModel) ? aiModel : 'gemini-3-flash-preview';
 
-    const result = await model.generateContent(finalPrompt);
+    const model = genAI.getGenerativeModel({
+      model: selectedModel,
+      systemInstruction: systemInstruction,
+      tools: tools,
+      generationConfig: {
+        temperature: 1.0,
+        maxOutputTokens: 8192,
+      }
+    });
+
+    // Format history for startChat
+    // Incoming: [{ role: 'user'|'ai', content: '...' }]
+    // Outgoing: [{ role: 'user'|'model', parts: [{ text: '...' }] }]
+    const chatHistory = (history || []).map(msg => ({
+      role: msg.role === 'ai' ? 'model' : 'user',
+      parts: [{ text: msg.content }]
+    }));
+
+    const chat = model.startChat({
+      history: chatHistory
+    });
+
+    // Send Message
+    const result = await chat.sendMessage(message);
     const response = await result.response;
-    const text = response.text();
-    return res.status(200).json({ reply: text });
+
+    // handle function calls (single turn for now, simple implementation)
+    // The model might call a function. We need to check for it.
+    const calls = response.functionCalls();
+
+    if (calls && calls.length > 0) {
+      // For simplicity, we handle the first call. 
+      // In a true multi-turn loop, we'd loop while calls exist. 
+      // Here we just do one hop: Model -> Tool -> Model -> Final Reply.
+
+      const call = calls[0];
+      if (call.name === 'read_github_file') {
+        console.log(`[Tool] Reading file: ${call.args.filePath}`);
+
+        // Execute Tool
+        const fileContent = await fetchGithubFile(repoUrl, call.args.filePath);
+
+        // Send Response back to model
+        const result2 = await chat.sendMessage([
+          {
+            functionResponse: {
+              name: 'read_github_file',
+              response: { content: fileContent }
+            }
+          }
+        ]);
+
+        const response2 = await result2.response;
+        return res.status(200).json({ reply: response2.text() });
+      }
+    }
+
+    // Default response if no tool called
+    return res.status(200).json({ reply: response.text() });
 
   } catch (error) {
     console.error('Gemini API Error:', error);
