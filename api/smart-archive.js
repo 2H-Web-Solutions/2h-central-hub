@@ -38,6 +38,7 @@ export default async function handler(req, res) {
         3. Remove completed To-Dos. Add new To-Dos if mentioned.
         4. Keep the structure clean (Markdown).
         5. OUTPUT ONLY THE NEW DOCUMENTATION TEXT. NO CHAT.
+        6. FACT CHECK: If the chat contains hallucinations (e.g. "Gemini 3 unavailable"), DO NOT archive them. Archive the CORRECTION instead ("Gemini 3 activated").
         `;
 
         // 4. Generate

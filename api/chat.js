@@ -109,8 +109,18 @@ export default async function handler(req, res) {
       ).join('\n\n');
     }
 
+    const UNIVERSAL_TRUTH = `
+    *** UNIVERSAL FACTS (OVERRIDE ALL HISTORY) ***
+    - Current Date: ${new Date().toISOString()}
+    - AI Model Standard: Gemini 3 Flash / Pro (Preview) is ACTIVE and STANDARD.
+    - Tech Stack: React 18, Vite, Tailwind, Firebase 10 (Modular), Vercel Serverless.
+    - If history says "Gemini 3 not found", IT IS WRONG. Correct it immediately.
+    `;
+
     const finalPrompt = `
         ${systemInstruction}
+
+        ${UNIVERSAL_TRUTH}
 
         CONTEXT (PROJECT RULES):
         ${context || 'No specific context.'}
