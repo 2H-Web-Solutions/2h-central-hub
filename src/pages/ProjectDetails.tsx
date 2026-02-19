@@ -561,6 +561,39 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
         }
     };
 
+    const handleRefineBrain = async () => {
+        if (!project?.memory) return toast.error("No memory to refine.");
+
+        const confirmRefine = window.confirm("Optimize Project Knowledge? This will fix errors but keep history.");
+        if (!confirmRefine) return;
+
+        const toastId = toast.loading("Refining brain...");
+
+        try {
+            const response = await fetch('/api/refine-memory', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ currentMemory: project.memory })
+            });
+
+            if (!response.ok) throw new Error("Refine failed");
+
+            const data = await response.json();
+
+            // Update Firestore
+            if (projectId) {
+                await updateDoc(doc(db, 'apps', '2h_hub_v1', 'projects', projectId), {
+                    memory: data.refinedMemory
+                });
+            }
+
+            toast.success("Brain optimized!", { id: toastId });
+        } catch (err) {
+            console.error(err);
+            toast.error("Failed to refine memory", { id: toastId });
+        }
+    };
+
     if (loading) {
         return (
             <DashboardShell headerTitle="Loading..." sidebarContent={<SidebarNav />}>
@@ -772,12 +805,20 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                                 {/* Add Note Header */}
                                 <div className="p-4 border-b border-gray-50 flex justify-between items-center bg-gray-50/30">
                                     <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Logbook Entries</span>
-                                    <button
-                                        onClick={() => setIsNoteModalOpen(true)}
-                                        className="bg-brand-black text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-gray-800 transition-colors shadow-sm"
-                                    >
-                                        <Plus size={14} /> Add Note
-                                    </button>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={handleRefineBrain}
+                                            className="bg-white border border-gray-200 text-gray-600 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 hover:border-brand-lime hover:text-brand-lime transition-colors shadow-sm"
+                                        >
+                                            <Sparkles size={14} /> Refine Brain
+                                        </button>
+                                        <button
+                                            onClick={() => setIsNoteModalOpen(true)}
+                                            className="bg-brand-black text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-gray-800 transition-colors shadow-sm"
+                                        >
+                                            <Plus size={14} /> Add Note
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -947,6 +988,14 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                             </div>
 
                             <div className="flex gap-2">
+                                <button
+                                    onClick={handleRefineBrain}
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-purple-100 text-purple-700 hover:bg-purple-200 rounded-md transition-colors border border-purple-200 mr-2"
+                                    title="Refine & Sanitize Memory"
+                                >
+                                    <Sparkles size={16} />
+                                    <span className="text-sm font-medium">Refine</span>
+                                </button>
                                 <button
                                     onClick={handleSmartArchive}
                                     className={`text-xs font-medium bg-white border px-3 py-1.5 rounded-lg flex items-center gap-2 transition-colors shadow-sm ${agentMode === 'STARTER'
