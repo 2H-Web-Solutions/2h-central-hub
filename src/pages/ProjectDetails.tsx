@@ -993,25 +993,18 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
 
                                 {/* GITHUB CODE VIEW TOGGLE */}
                                 <button
-                                    onClick={() => setViewMode(viewMode === 'chat' ? 'code' : 'chat')}
-                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-md transition-colors border ${viewMode === 'code'
-                                        ? 'bg-blue-100 text-blue-700 border-blue-200'
+                                    onClick={() => setViewMode(prev => prev === 'chat' ? 'code' : 'chat')}
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-md transition-colors border shadow-sm ${viewMode === 'code'
+                                        ? 'bg-brand-lime text-brand-black border-brand-lime'
                                         : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
                                         }`}
-                                    title="Process Code"
+                                    title={viewMode === 'code' ? "Back to Chat" : "View Code"}
                                 >
-                                    <Code2 size={16} />
-                                    <span className="text-sm font-medium">{viewMode === 'code' ? 'Close Code' : 'Code'}</span>
+                                    {viewMode === 'code' ? <MessageSquare size={16} /> : <Code2 size={16} />}
+                                    <span className="text-sm font-medium">{viewMode === 'code' ? 'Chat' : 'Code'}</span>
                                 </button>
 
-                                <button
-                                    onClick={handleRefineBrain}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-purple-100 text-purple-700 hover:bg-purple-200 rounded-md transition-colors border border-purple-200 mr-2"
-                                    title="Refine & Sanitize Memory"
-                                >
-                                    <Sparkles size={16} />
-                                    <span className="text-sm font-medium">Refine</span>
-                                </button>
+
                                 <button
                                     onClick={handleSmartArchive}
                                     className={`text-xs font-medium bg-white border px-3 py-1.5 rounded-lg flex items-center gap-2 transition-colors shadow-sm ${agentMode === 'STARTER'
