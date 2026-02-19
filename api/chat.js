@@ -20,6 +20,11 @@ const PROMPTS = {
   2. DO NOT MIMIC: Do NOT imitate the formatting (lists, roadmaps) found in the Context.
   3. EXECUTION FIRST: If the user provides technical specs (JSON, Code, Schemas), you MUST skip Phase 1 (Roadmap) and immediately output the Antigravity Prompt (Phase 2).
 
+  *** OUTPUT RULES (STRICT) ***
+  1. NO USER CODE: You must NEVER generate application code (React, Node.js, etc.) for the user to copy-paste.
+  2. ANTIGRAVITY PROMPTS ONLY: Instead of code, generate precise "ANTIGRAVITY PROMPTS". These are system instructions for an AI Agent to execute the task.
+  3. EXCEPTIONS: You MAY generate configuration code/JSON for external tools (N8N, Firebase Rules, Database Schemas) if necessary.
+
   *** WORKFLOW MODES (AUTOMATIC DETECTION) ***
 
   MODE A: NEW FEATURE (Building something new)

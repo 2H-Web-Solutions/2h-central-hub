@@ -1,56 +1,162 @@
+// src/lib/gemini.ts
+
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { db } from "./firebase";
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-
 if (!API_KEY) {
-    console.error("❌ CRITICAL: VITE_GEMINI_API_KEY fehlt in der .env Datei!");
+    console.warn("⚠️ VITE_GEMINI_API_KEY missing in .env");
 }
-
-// Initialisiere SDK
 const genAI = new GoogleGenerativeAI(API_KEY || "");
 
-// STRICT RULE: Wir nutzen nur Gemini 3 (Preview/Flash)
+// Default model if none specified
+const DEFAULT_MODEL = "gemini-3-flash-preview";
 
+/**
+ * FETCHES FILTERED KNOWLEDGE from Global Brain.
+ * Always loads 'General' and 'Global' categories to secure the persona.
+ */
+async function getGlobalKnowledge(category?: string): Promise<string> {
+    try {
+        // NOTE: This path is specific to the "Google Ads Assistant" app as requested. 
+        // In a generic codebase, this should potentially be dynamic based on the active app context.
+        const knowledgeRef = collection(db, 'apps/2h_web_solutions_google_ads_asssitant_v1/knowledge/global_brain');
 
-const MODEL_VERSION = "gemini-3-flash-preview";
+        const categories = ['General', 'Global'];
+        if (category) categories.push(category);
+
+        const q = query(knowledgeRef, where('category', 'in', categories));
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) {
+            // Fallback to full fetch to ensure accuracy if filtered query returns nothing
+            const fullSnapshot = await getDocs(knowledgeRef);
+            return formatKnowledge(fullSnapshot);
+        }
+
+        return formatKnowledge(snapshot);
+    } catch (error) {
+        console.error("Fehler beim Laden des Global Brain:", error);
+        return "Fehler: Wissensdatenbank konnte nicht geladen werden.";
+    }
+}
+
+/**
+ * Formats Firestore documents for the system prompt.
+ */
+function formatKnowledge(snapshot: any): string {
+    return snapshot.docs
+        .map((doc: any) => {
+            const data = doc.data();
+            return `[KATEGORIE: ${data.category}] ${data.title}: ${data.content}`;
+        })
+        .join("\n\n---\n\n");
+}
 
 export const geminiService = {
     /**
-     * Sendet einen Prompt an Gemini und gibt den Text zurück.
-     * @param prompt Der Eingabetext für die KI
-     * @returns Die Antwort der KI als String
+     * Simple generation (kept for backward compatibility)
      */
-    async generateContent(prompt: string): Promise<string> {
-        if (!API_KEY) return "Fehler: API Key fehlt.";
-
+    async generateContent(prompt: string, modelName: string = DEFAULT_MODEL): Promise<string> {
         try {
-            const model = genAI.getGenerativeModel({ model: MODEL_VERSION });
-
+            const model = genAI.getGenerativeModel({ model: modelName });
             const result = await model.generateContent(prompt);
             const response = await result.response;
-            const text = response.text();
-
-            return text;
-        } catch (error: any) {
-            console.error(`⚠️ GEMINI ERROR [${MODEL_VERSION}]:`, error);
-
-            // Spezifische Fehlerbehandlung für 404/Modell nicht gefunden
-            if (error.message?.includes("404") || error.message?.includes("not found")) {
-                return `Systemfehler: Das Modell '${MODEL_VERSION}' ist derzeit nicht erreichbar oder der API Key hat keinen Zugriff darauf.`;
-            }
-
-            return "Entschuldigung, ich konnte die Anfrage momentan nicht verarbeiten.";
+            return response.text();
+        } catch (error) {
+            console.error("Gemini Error:", error);
+            return "Error processing request.";
         }
     }
 };
 
 /**
- * Refines brand information based on user instructions using AI.
- * @param currentData The current brand data (JSON object)
- * @param instruction The user's instruction for refinement
- * @returns The updated brand data as a JSON object
+ * Analyzes a brand considering the Global Brain (Persona).
+ * Allows dynamic model selection (Flash/Pro).
  */
-export const refineBrandInfo = async (currentData: any, instruction: string) => {
+export async function analyzeBrand(
+    url: string,
+    scrapedContent: string,
+    userHints?: string,
+    modelName: string = DEFAULT_MODEL
+) {
+    const globalKnowledge = await getGlobalKnowledge('Persona');
+
+    const model = genAI.getGenerativeModel({
+        model: modelName,
+        systemInstruction: `
+      ROLE: Senior Performance Marketing Strategic Advisor (2H Web Solutions).
+      
+      STRICT REALITY HIERARCHY:
+      1. GLOBAL KNOWLEDGE (Long-Term Memory) - MANDATORY OVERRIDE
+      2. USER HINTS / INSTRUCTIONS
+      3. SCRAPED WEBSITE CONTENT
+      4. INTERNAL AI KNOWLEDGE - LAST RESORT
+      
+      ### GLOBAL KNOWLEDGE BASE (Your Brain):
+      ${globalKnowledge}
+      
+      ### OPERATIONAL DIRECTIVE:
+      - Nutze die GLOBAL KNOWLEDGE BASE als primäre Quelle für Strategien und Standards. 
+      - Informationen aus der Wissensdatenbank überschreiben alle anderen Annahmen.
+      - Sprache: Deutsch (Du-Form).
+      - Struktur: Insight | Data | Action.
+    `
+    });
+
+    const prompt = `
+    Analyze this brand based on:
+    URL: ${url}
+    Content: ${scrapedContent.substring(0, 50000)}
+    Hints: ${userHints || "None"}
+  `;
+
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+}
+
+/**
+ * Generates a chat response considering the Global Brain.
+ * Allows dynamic model selection (Flash/Pro).
+ */
+export async function getChatResponse(
+    messages: any[],
+    context: any,
+    modelName: string = DEFAULT_MODEL
+) {
+    const globalKnowledge = await getGlobalKnowledge();
+
+    const model = genAI.getGenerativeModel({
+        model: modelName,
+        systemInstruction: `
+      ROLE: Proactive Senior Performance Marketer.
+      
+      ### GLOBAL KNOWLEDGE BASE:
+      ${globalKnowledge}
+      
+      Beantworte Anfragen strikt nach diesen Unternehmensstandards. 
+      Priorisiere dieses Wissen gegenüber allgemeinen Informationen.
+    `
+    });
+
+    // Convert messages to Gemini format
+    const chat = model.startChat({
+        history: messages.map(m => ({
+            role: m.role === 'user' ? 'user' : 'model',
+            parts: [{ text: m.content }]
+        }))
+    });
+
+    const lastMessage = messages[messages.length - 1];
+    const result = await chat.sendMessage(lastMessage.content);
+    return result.response.text();
+}
+
+/**
+ * Refines brand information based on user instructions using AI.
+ */
+export const refineBrandInfo = async (currentData: any, instruction: string, modelName: string = DEFAULT_MODEL) => {
     const prompt = `
       SYSTEM: You are an AI editor. You will receive a JSON object describing a business and a user correction instruction.
       GOAL: Update the JSON fields strictly following the user instruction. Keep the tone professional. Return ONLY the valid JSON.
@@ -66,7 +172,7 @@ export const refineBrandInfo = async (currentData: any, instruction: string) => 
     `;
 
     try {
-        const result = await geminiService.generateContent(prompt);
+        const result = await geminiService.generateContent(prompt, modelName);
         // Clean up markdown code blocks if present
         const cleanJson = result.replace(/```json/g, '').replace(/```/g, '').trim();
         return JSON.parse(cleanJson);
