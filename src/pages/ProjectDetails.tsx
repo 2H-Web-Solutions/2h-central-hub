@@ -5,7 +5,8 @@ import { db } from '../lib/firebase';
 import DashboardShell from '../components/DashboardShell';
 import SidebarNav from '../components/SidebarNav';
 import Button from '../components/Button';
-import { Github, Globe, ExternalLink, MessageSquare, Trash2, Lock, Copy, Paperclip, X, Archive, Map, Hammer, Bug, BookOpen, Edit2, Plus, PenSquare, Key, Check, Sparkles } from 'lucide-react';
+import { Github, Globe, ExternalLink, MessageSquare, Trash2, Lock, Copy, Paperclip, X, Archive, Map, Hammer, Bug, BookOpen, Edit2, Plus, PenSquare, Key, Check, Sparkles, Code2 } from 'lucide-react';
+import RepoExplorer from '../components/glassbox/RepoExplorer';
 import ReactMarkdown from 'react-markdown';
 import toast from 'react-hot-toast';
 
@@ -141,6 +142,7 @@ export default function ProjectDetails() {
     const [isThinking, setIsThinking] = useState(false);
     const [agentMode, setAgentMode] = useState<'STARTER' | 'BUILDER' | 'SOLVER'>('BUILDER');
     const [attachments, setAttachments] = useState<string[]>([]);
+    const [viewMode, setViewMode] = useState<'chat' | 'code'>('chat');
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -988,6 +990,20 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                             </div>
 
                             <div className="flex gap-2">
+
+                                {/* GITHUB CODE VIEW TOGGLE */}
+                                <button
+                                    onClick={() => setViewMode(viewMode === 'chat' ? 'code' : 'chat')}
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-md transition-colors border ${viewMode === 'code'
+                                        ? 'bg-blue-100 text-blue-700 border-blue-200'
+                                        : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                                        }`}
+                                    title="Process Code"
+                                >
+                                    <Code2 size={16} />
+                                    <span className="text-sm font-medium">{viewMode === 'code' ? 'Close Code' : 'Code'}</span>
+                                </button>
+
                                 <button
                                     onClick={handleRefineBrain}
                                     className="flex items-center gap-2 px-3 py-1.5 bg-purple-100 text-purple-700 hover:bg-purple-200 rounded-md transition-colors border border-purple-200 mr-2"
@@ -1018,127 +1034,135 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                     </div>
 
                     {/* Messages Area */}
-                    <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-white">
-                        {messages.length === 0 && (
-                            <div className="flex flex-col items-center justify-center h-full text-gray-400 space-y-2">
-                                <MessageSquare size={32} className="opacity-20" />
-                                <p>Start building <strong>{project?.clientName}</strong>...</p>
-                            </div>
-                        )}
+                    {viewMode === 'chat' ? (
+                        <>
+                            <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-white">
+                                {messages.length === 0 && (
+                                    <div className="flex flex-col items-center justify-center h-full text-gray-400 space-y-2">
+                                        <MessageSquare size={32} className="opacity-20" />
+                                        <p>Start building <strong>{project?.clientName}</strong>...</p>
+                                    </div>
+                                )}
 
-                        {messages.map((msg) => (
-                            <div
-                                key={msg.id}
-                                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                            >
-                                <div
-                                    className={`max-w-[80%] px-5 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${msg.role === 'user'
-                                        ? 'bg-[#B7EF02] text-brand-black rounded-tr-none font-medium'
-                                        : 'bg-gray-100 text-gray-800 rounded-tl-none'
-                                        }`}
-                                >
-                                    {/* Attachments */}
-                                    {msg.attachments && msg.attachments.length > 0 && (
-                                        <div className="flex flex-wrap gap-2 mb-2">
-                                            {msg.attachments.map((src, idx) => (
-                                                <img key={idx} src={src} className="max-w-[200px] max-h-[200px] rounded-lg border border-black/10" alt="Attachment" />
-                                            ))}
-                                        </div>
-                                    )}
-                                    <ReactMarkdown
-                                        components={{
-                                            code(props) {
-                                                const { children, className, node, ...rest } = props;
-                                                const match = /language-(\w+)/.exec(className || '');
-                                                return match ? (
-                                                    <CodeBlock language={match[1]}>{String(children).replace(/\n$/, '')}</CodeBlock>
-                                                ) : (
-                                                    <code className="bg-black/5 px-1 py-0.5 rounded font-mono text-[0.9em] text-brand-black/80" {...rest}>
-                                                        {children}
-                                                    </code>
-                                                );
-                                            },
-                                            // Style other markdown elements to match the chat look
-                                            p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                                            ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
-                                            ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
-                                            li: ({ children }) => <li>{children}</li>,
-                                            a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline hover:text-blue-800">{children}</a>
-                                        }}
+                                {messages.map((msg) => (
+                                    <div
+                                        key={msg.id}
+                                        className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                                     >
-                                        {msg.content}
-                                    </ReactMarkdown>
-                                </div>
-                            </div>
-                        ))}
-                        {isThinking && (
-                            <div className="flex justify-start animate-pulse">
-                                <div className="bg-gray-100 px-5 py-3 rounded-2xl rounded-tl-none text-sm text-gray-500 italic">
-                                    Thinking...
-                                </div>
-                            </div>
-                        )}
-                        <div ref={messagesEndRef} />
-                    </div>
-
-                    {/* Input Area */}
-                    <div className="p-4 bg-white border-t border-gray-100">
-                        {/* Attachment Previews */}
-                        {attachments.length > 0 && (
-                            <div className="flex flex-wrap gap-2 mb-3 pb-2">
-                                {attachments.map((src, index) => (
-                                    <div key={index} className="relative group shrink-0">
-                                        <img src={src} className="h-16 w-16 object-cover rounded-lg border border-gray-200" alt="preview" />
-                                        <button
-                                            onClick={() => removeAttachment(index)}
-                                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        <div
+                                            className={`max-w-[80%] px-5 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${msg.role === 'user'
+                                                ? 'bg-[#B7EF02] text-brand-black rounded-tr-none font-medium'
+                                                : 'bg-gray-100 text-gray-800 rounded-tl-none'
+                                                }`}
                                         >
-                                            <X size={12} />
-                                        </button>
+                                            {/* Attachments */}
+                                            {msg.attachments && msg.attachments.length > 0 && (
+                                                <div className="flex flex-wrap gap-2 mb-2">
+                                                    {msg.attachments.map((src, idx) => (
+                                                        <img key={idx} src={src} className="max-w-[200px] max-h-[200px] rounded-lg border border-black/10" alt="Attachment" />
+                                                    ))}
+                                                </div>
+                                            )}
+                                            <ReactMarkdown
+                                                components={{
+                                                    code(props) {
+                                                        const { children, className, node, ...rest } = props;
+                                                        const match = /language-(\w+)/.exec(className || '');
+                                                        return match ? (
+                                                            <CodeBlock language={match[1]}>{String(children).replace(/\n$/, '')}</CodeBlock>
+                                                        ) : (
+                                                            <code className="bg-black/5 px-1 py-0.5 rounded font-mono text-[0.9em] text-brand-black/80" {...rest}>
+                                                                {children}
+                                                            </code>
+                                                        );
+                                                    },
+                                                    // Style other markdown elements to match the chat look
+                                                    p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                                                    ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
+                                                    ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
+                                                    li: ({ children }) => <li>{children}</li>,
+                                                    a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline hover:text-blue-800">{children}</a>
+                                                }}
+                                            >
+                                                {msg.content}
+                                            </ReactMarkdown>
+                                        </div>
                                     </div>
                                 ))}
+                                {isThinking && (
+                                    <div className="flex justify-start animate-pulse">
+                                        <div className="bg-gray-100 px-5 py-3 rounded-2xl rounded-tl-none text-sm text-gray-500 italic">
+                                            Thinking...
+                                        </div>
+                                    </div>
+                                )}
+                                <div ref={messagesEndRef} />
                             </div>
-                        )}
 
-                        <form onSubmit={handleSendMessage} className="flex gap-2 items-end">
-                            {/* File Button */}
-                            <button
-                                type="button"
-                                onClick={() => fileInputRef.current?.click()}
-                                className="p-3 text-gray-400 hover:text-brand-lime hover:bg-gray-50 rounded-xl transition-colors"
-                            >
-                                <Paperclip size={20} />
-                            </button>
-                            <input
-                                type="file"
-                                ref={fileInputRef}
-                                className="hidden"
-                                accept="image/*"
-                                multiple
-                                onChange={handleFileSelect}
-                            />
+                            {/* Input Area */}
+                            <div className="p-4 bg-white border-t border-gray-100">
+                                {/* Attachment Previews */}
+                                {attachments.length > 0 && (
+                                    <div className="flex flex-wrap gap-2 mb-3 pb-2">
+                                        {attachments.map((src, index) => (
+                                            <div key={index} className="relative group shrink-0">
+                                                <img src={src} className="h-16 w-16 object-cover rounded-lg border border-gray-200" alt="preview" />
+                                                <button
+                                                    onClick={() => removeAttachment(index)}
+                                                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                >
+                                                    <X size={12} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
 
-                            {/* Text Input */}
-                            <textarea
-                                className="flex-1 px-4 py-3 rounded-xl border border-gray-200 focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none transition-all bg-gray-50 text-brand-black resize-none min-h-[46px] max-h-[200px]"
-                                placeholder="Instructions for the builder... (Ctrl+Enter to send)"
-                                value={chatInput}
-                                onChange={(e) => setChatInput(e.target.value)}
-                                onPaste={handlePaste}
-                                onKeyDown={handleKeyDown}
-                                rows={1}
-                                style={{ height: 'auto', minHeight: '46px' }}
-                                onInput={(e) => {
-                                    e.currentTarget.style.height = 'auto';
-                                    e.currentTarget.style.height = e.currentTarget.scrollHeight + 'px';
-                                }}
-                            />
+                                <form onSubmit={handleSendMessage} className="flex gap-2 items-end">
+                                    {/* File Button */}
+                                    <button
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="p-3 text-gray-400 hover:text-brand-lime hover:bg-gray-50 rounded-xl transition-colors"
+                                    >
+                                        <Paperclip size={20} />
+                                    </button>
+                                    <input
+                                        type="file"
+                                        ref={fileInputRef}
+                                        className="hidden"
+                                        accept="image/*"
+                                        multiple
+                                        onChange={handleFileSelect}
+                                    />
 
-                            <Button type="submit" variant="primary" className="h-[46px]">
-                                Send
-                            </Button>
-                        </form>
-                    </div>
+                                    {/* Text Input */}
+                                    <textarea
+                                        className="flex-1 px-4 py-3 rounded-xl border border-gray-200 focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none transition-all bg-gray-50 text-brand-black resize-none min-h-[46px] max-h-[200px]"
+                                        placeholder="Instructions for the builder... (Ctrl+Enter to send)"
+                                        value={chatInput}
+                                        onChange={(e) => setChatInput(e.target.value)}
+                                        onPaste={handlePaste}
+                                        onKeyDown={handleKeyDown}
+                                        rows={1}
+                                        style={{ height: 'auto', minHeight: '46px' }}
+                                        onInput={(e) => {
+                                            e.currentTarget.style.height = 'auto';
+                                            e.currentTarget.style.height = e.currentTarget.scrollHeight + 'px';
+                                        }}
+                                    />
+
+                                    <Button type="submit" variant="primary" className="h-[46px]">
+                                        Send
+                                    </Button>
+                                </form>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="absolute inset-0 p-4 bg-gray-50">
+                            <RepoExplorer repoUrl={project?.githubUrl || ''} />
+                        </div>
+                    )}
                 </div>
             </div>
         </DashboardShell>
