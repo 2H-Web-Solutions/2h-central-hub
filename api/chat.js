@@ -232,7 +232,7 @@ export default async function handler(req, res) {
     // Start conversation loop to handle multiple tool hops
     let currentResponse = response;
     let turnCount = 0;
-    const MAX_TURNS = 5;
+    const MAX_TURNS = 10;
     let toolCallLogs = [];
 
     while (currentResponse.functionCalls() && currentResponse.functionCalls().length > 0 && turnCount < MAX_TURNS) {
