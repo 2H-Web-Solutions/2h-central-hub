@@ -229,12 +229,14 @@ export default async function handler(req, res) {
       }
     };
 
-    if (calls && calls.length > 0) {
-      // For simplicity, we handle the first call. 
-      // In a true multi-turn loop, we'd loop while calls exist. 
-      // Here we just do one hop: Model -> Tool -> Model -> Final Reply.
+    // Start conversation loop to handle multiple tool hops
+    let currentResponse = response;
+    let turnCount = 0;
+    const MAX_TURNS = 5;
 
-      const call = calls[0];
+    while (currentResponse.functionCalls() && currentResponse.functionCalls().length > 0 && turnCount < MAX_TURNS) {
+      const call = currentResponse.functionCalls()[0];
+
       if (call.name === 'read_github_file') {
         console.log(`[Tool] Reading file: ${call.args.filePath}`);
 
@@ -242,7 +244,7 @@ export default async function handler(req, res) {
         const fileContent = await fetchGithubFile(repoUrl, call.args.filePath);
 
         // Send Response back to model
-        const result2 = await chat.sendMessage([
+        const toolResult = await chat.sendMessage([
           {
             functionResponse: {
               name: 'read_github_file',
@@ -251,13 +253,17 @@ export default async function handler(req, res) {
           }
         ]);
 
-        const response2 = await result2.response;
-        return res.status(200).json({ reply: safeGetText(response2) });
+        currentResponse = await toolResult.response;
+      } else {
+        console.warn(`[Tool] Unknown function call: ${call.name}`);
+        break; // Stop if it tries to call a tool we didn't provide
       }
+
+      turnCount++;
     }
 
-    // Default response if no tool called
-    return res.status(200).json({ reply: safeGetText(response) });
+    // Default response if no tool called or after all tool calls finish
+    return res.status(200).json({ reply: safeGetText(currentResponse) });
 
   } catch (error) {
     console.error('Gemini API Error:', error);
