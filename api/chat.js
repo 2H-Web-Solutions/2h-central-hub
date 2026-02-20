@@ -214,6 +214,21 @@ export default async function handler(req, res) {
     // The model might call a function. We need to check for it.
     const calls = response.functionCalls();
 
+    const safeGetText = (resp) => {
+      try {
+        const text = resp.text();
+        if (text) return text;
+        const calls = resp.functionCalls();
+        if (calls && calls.length > 0) {
+          return `[System: The AI attempted to call a function '${calls[0].name}' but did not provide a text response.]`;
+        }
+        return "[System: The AI returned an empty response.]";
+      } catch (e) {
+        console.warn("safeGetText error:", e);
+        return `[System: Could not parse AI response. Error: ${e.message}]`;
+      }
+    };
+
     if (calls && calls.length > 0) {
       // For simplicity, we handle the first call. 
       // In a true multi-turn loop, we'd loop while calls exist. 
@@ -237,12 +252,12 @@ export default async function handler(req, res) {
         ]);
 
         const response2 = await result2.response;
-        return res.status(200).json({ reply: response2.text() });
+        return res.status(200).json({ reply: safeGetText(response2) });
       }
     }
 
     // Default response if no tool called
-    return res.status(200).json({ reply: response.text() });
+    return res.status(200).json({ reply: safeGetText(response) });
 
   } catch (error) {
     console.error('Gemini API Error:', error);
