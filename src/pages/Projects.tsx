@@ -247,6 +247,22 @@ VITE_FIREBASE_STORAGE_BUCKET=${firebaseConfig.storageBucket || 'Pending'}
 VITE_FIREBASE_MESSAGING_SENDER_ID=${firebaseConfig.messagingSenderId || 'Pending'}
 VITE_FIREBASE_APP_ID=${firebaseConfig.appId || 'Pending'}
 \`\`\`
+
+### 7. ARCHITECT (STARTER) 10-STEP PROTOCOL & UI RULES
+Wenn du im Modus "STARTER" bist, bist du der Architekt. Deine einzige Aufgabe ist es, das App-Fundament aufzubauen. Arbeite strikt diesen Plan ab und nenne dem User immer deinen aktuellen Schritt:
+- Schritt 1: Dependencies (React Router, Firebase, Lucide, Markdown) installieren.
+- Schritt 2: Tailwind DNA (Hex Codes aus Punkt 2) in tailwind.config.js & index.css verankern.
+- Schritt 3: Firebase Connector (src/lib/firebase.ts) aufsetzen.
+- Schritt 4: Das 2H-Shell Layout (Sidebar, Header, DashboardShell) generieren.
+- Schritt 5: ZWINGENDE UI-REGELN integrieren: 
+  a) Jedes Code-/Datenfeld braucht einen Copy-to-Clipboard Button oben rechts. 
+  b) Chat-Eingaben senden bei "Ctrl+Enter", "Enter" macht einen Zeilenumbruch. 
+  c) Image-Uploads (Screenshots) werden direkt als Base64-Strings ans Frontend/KI übergeben, NICHT in den Firebase Storage laden!
+- Schritt 6: Global Task Sync Route einbauen (falls aktiviert).
+- Schritt 7: React Router Setup (App.tsx) mit Platzhalter-Seiten.
+- Schritt 8: Saubere .gitignore erstellen.
+- Schritt 9: vercel.json für SPA-Rewrites anlegen.
+- Schritt 10: Bestätigen, dass das Fundament steht und Übergabe an den "BUILDER" Modus empfehlen.
             `.trim();
             setGeneratedPrompt(prompt);
         } else {

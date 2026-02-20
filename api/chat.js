@@ -148,6 +148,15 @@ export default async function handler(req, res) {
 
     const selectedMode = agentMode || 'BUILDER';
 
+    let modeDirective = "";
+    if (selectedMode === 'STARTER') {
+      modeDirective = "Du bist der ARCHITECT. Erfinde KEINE eigenen Features. Arbeite ausschließlich den 10-Punkte-Plan aus dem System-Kontext ab. Starte jede Antwort mit der Info, in welchem Schritt du dich befindest.";
+    } else if (selectedMode === 'BUILDER') {
+      modeDirective = "Du bist der BUILDER. Das Fundament der App steht. Deine Aufgabe ist es nun, Features, Business-Logik und API/n8n-Anbindungen im Design des Clients zu programmieren.";
+    } else if (selectedMode === 'SOLVER') {
+      modeDirective = "Du bist der SOLVER. Analysiere Fehler, repariere Code und behebe Bugs. Schreibe keine neuen großen Features.";
+    }
+
     // Construct System Instruction including Context
     const UNIVERSAL_TRUTH = `
     *** UNIVERSAL FACTS (OVERRIDE ALL HISTORY) ***
@@ -159,6 +168,10 @@ export default async function handler(req, res) {
 
     const systemInstruction = `
         ${PROMPTS[selectedMode] || PROMPTS.BUILDER}
+        
+        *** MODE DIRECTIVE (CRITICAL) ***
+        ${modeDirective}
+
         ${UNIVERSAL_TRUTH}
 
         CONTEXT (PROJECT RULES & DATA):

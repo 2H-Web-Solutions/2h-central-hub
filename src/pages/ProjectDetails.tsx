@@ -440,7 +440,7 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                 body: JSON.stringify({
                     message: currentInput + (currentAttachments.length > 0 ? `\n[With ${currentAttachments.length} images]` : ''),
                     context: combinedContext,
-                    agent: "Builder",
+                    agent: agentMode === 'STARTER' ? 'Architect' : agentMode === 'BUILDER' ? 'Builder' : 'Fixer',
                     agentMode: agentMode,
                     aiModel: project?.aiModel || 'gemini-3-flash-preview',
                     history: messages.map(m => ({ role: m.role, content: m.content })),
@@ -957,9 +957,14 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                                 {agentMode === 'STARTER' ? 'Architect Assistant' :
                                     agentMode === 'BUILDER' ? 'Builder Assistant' :
                                         'Fixer Assistant'}
+                                {agentMode === 'STARTER' && (
+                                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-[10px] uppercase tracking-wider font-bold animate-pulse border border-green-200 ml-1">
+                                        <Sparkles size={10} /> Strict Mode
+                                    </span>
+                                )}
                             </h3>
-                            <p className="text-xs text-brand-text-muted">
-                                {agentMode === 'STARTER' ? 'Planning & Setup' :
+                            <p className="text-xs text-brand-text-muted mt-0.5">
+                                {agentMode === 'STARTER' ? 'Executing 10-Step Foundation Plan' :
                                     agentMode === 'BUILDER' ? 'Features & Logic' :
                                         'Debugger & Fixes'}
                             </p>
@@ -1135,7 +1140,7 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                                         {/* Text Input */}
                                         <textarea
                                             className="flex-1 px-4 py-3 rounded-xl border border-gray-200 focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none transition-all bg-gray-50 text-brand-black resize-none min-h-[46px] max-h-[200px]"
-                                            placeholder="Instructions for the builder... (Ctrl+Enter to send)"
+                                            placeholder={agentMode === 'STARTER' ? "Type 'Start' to begin the 10-step Architect plan... (Ctrl+Enter to send)" : agentMode === 'BUILDER' ? "Describe the next feature to build... (Ctrl+Enter to send)" : "Paste the error code or describe the bug... (Ctrl+Enter to send)"}
                                             value={chatInput}
                                             onChange={(e) => setChatInput(e.target.value)}
                                             onPaste={handlePaste}
