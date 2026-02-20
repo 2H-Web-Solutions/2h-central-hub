@@ -181,3 +181,70 @@ export const refineBrandInfo = async (currentData: any, instruction: string, mod
         throw new Error("Failed to refine data.");
     }
 };
+
+/**
+ * Scans a given website URL based on Gemini's knowledge/browsing and extracts Brand DNA.
+ */
+export const extractBrandFromUrl = async (url: string, modelName: string = DEFAULT_MODEL) => {
+    const prompt = `
+Analysiere die Website unter ${url} (basierend auf deinem Trainingswissen oder falls du browsen kannst) und schlage exakte Hex-Codes für Primary, Background, Surface sowie Heading und Body Google Fonts vor. 
+Antworte strikt als JSON mit folgenden Keys:
+- primaryColor
+- backgroundColor
+- surfaceColor
+- fontHeading
+- fontBody
+    `;
+
+    try {
+        const result = await geminiService.generateContent(prompt, modelName);
+        const cleanJson = result.replace(/```json/g, '').replace(/```/g, '').trim();
+        return JSON.parse(cleanJson);
+    } catch (error) {
+        console.error("AI URL Scan Error:", error);
+        throw new Error("Failed to extract brand from URL.");
+    }
+};
+
+/**
+ * Uses Gemini Vision to scan a screenshot and extract Brand DNA.
+ */
+export const extractBrandFromImage = async (base64DataUrl: string, modelName: string = DEFAULT_MODEL) => {
+    const prompt = `
+Analysiere diesen Screenshot der Kunden-Marke/Website. 
+Extrahiere die primäre Markenfarbe (primaryColor), die typische Hintergrundfarbe (backgroundColor), die Oberflächenfarbe für Cards (surfaceColor) als HEX-Codes. 
+Schätze außerdem eine passende Heading-Font und Body-Font (nur bekannte Google Fonts Namen wie 'Inter', 'Roboto', 'Playfair Display'). 
+Antworte strikt als JSON mit folgenden Keys:
+- primaryColor
+- backgroundColor
+- surfaceColor
+- fontHeading
+- fontBody
+    `;
+
+    try {
+        // Extract base64 and mime pattern
+        const mimeTypeMatch = base64DataUrl.match(/^data:(image\/\w+);base64,/);
+        if (!mimeTypeMatch) throw new Error("Invalid base64 image data");
+        const mimeType = mimeTypeMatch[1];
+        const base64Data = base64DataUrl.replace(/^data:image\/\w+;base64,/, "");
+
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const result = await model.generateContent([
+            prompt,
+            {
+                inlineData: {
+                    data: base64Data,
+                    mimeType: mimeType
+                }
+            }
+        ]);
+
+        const responseText = await result.response.text();
+        const cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+        return JSON.parse(cleanJson);
+    } catch (error) {
+        console.error("AI Image Scan Error:", error);
+        throw new Error("Failed to extract brand from image.");
+    }
+};

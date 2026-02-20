@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp, query, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import Button from '../components/Button';
 import DashboardShell from '../components/DashboardShell';
 import SidebarNav from '../components/SidebarNav';
 import SecureDeleteModal from '../components/SecureDeleteModal';
-import { Pencil, Trash2, Sparkles, Loader2 } from 'lucide-react';
-import { refineBrandInfo } from '../lib/gemini';
+import { Pencil, Trash2, Sparkles, Loader2, Image as ImageIcon, Scan } from 'lucide-react';
+import { extractBrandFromUrl, extractBrandFromImage } from '../lib/gemini';
 import toast from 'react-hot-toast';
 
 interface Client {
@@ -44,9 +44,10 @@ export default function Clients() {
     const [fontHeading, setFontHeading] = useState('Federo');
     const [fontBody, setFontBody] = useState('Barlow');
 
-    // AI Fix State
-    const [isFixing, setIsFixing] = useState(false);
-    const [fixInstruction, setFixInstruction] = useState('');
+    // AI Brand Scanner State
+    const [isScanning, setIsScanning] = useState(false);
+    const [scannedImage, setScannedImage] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Subscribe to Clients
     useEffect(() => {
@@ -76,7 +77,7 @@ export default function Clients() {
         setSurfaceColor('#ffffff');
         setFontHeading('Federo');
         setFontBody('Barlow');
-        setFixInstruction('');
+        setScannedImage(null);
         setEditingClient(null);
     };
 
@@ -143,39 +144,70 @@ export default function Clients() {
         }
     };
 
-    const handleAutoFix = async () => {
-        if (!fixInstruction.trim()) {
-            toast.error("Please enter an instruction for the AI.");
-            return;
-        }
+    const applyScannedData = (data: any) => {
+        if (data.primaryColor) setPrimaryColor(data.primaryColor);
+        if (data.backgroundColor) setBackgroundColor(data.backgroundColor);
+        if (data.surfaceColor) setSurfaceColor(data.surfaceColor);
+        if (data.fontHeading) setFontHeading(data.fontHeading);
+        if (data.fontBody) setFontBody(data.fontBody);
+    };
 
-        setIsFixing(true);
+    const handleScanUrl = async () => {
+        if (!website) return;
+        setIsScanning(true);
         try {
-            const currentData = {
-                companyName,
-                website,
-                primaryColor,
-                backgroundColor,
-                surfaceColor,
-                fontHeading,
-                fontBody
-            };
-
-            const refinedData = await refineBrandInfo(currentData, fixInstruction);
-
-            if (refinedData.primaryColor) setPrimaryColor(refinedData.primaryColor);
-            if (refinedData.backgroundColor) setBackgroundColor(refinedData.backgroundColor);
-            if (refinedData.surfaceColor) setSurfaceColor(refinedData.surfaceColor);
-            if (refinedData.fontHeading) setFontHeading(refinedData.fontHeading);
-            if (refinedData.fontBody) setFontBody(refinedData.fontBody);
-
-            toast.success("AI updated the fields based on your feedback!");
-            setFixInstruction(''); // Clear instruction after success
+            toast.loading("Analyzing Brand DNA...", { id: 'scan' });
+            const refinedData = await extractBrandFromUrl(website);
+            applyScannedData(refinedData);
+            toast.success("Brand DNA extracted!", { id: 'scan' });
         } catch (error) {
             console.error(error);
-            toast.error("AI Fix failed. Please try again.");
+            toast.error("Scan failed. Please try again.", { id: 'scan' });
         } finally {
-            setIsFixing(false);
+            setIsScanning(false);
+        }
+    };
+
+    const handleScanImage = async (base64: string) => {
+        setIsScanning(true);
+        setScannedImage(base64);
+        try {
+            toast.loading("Analyzing Screenshot...", { id: 'scan' });
+            const refinedData = await extractBrandFromImage(base64);
+            applyScannedData(refinedData);
+            toast.success("Brand DNA extracted!", { id: 'scan' });
+        } catch (error) {
+            console.error(error);
+            toast.error("Scan failed. Please try again.", { id: 'scan' });
+        } finally {
+            setIsScanning(false);
+        }
+    };
+
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => {
+                if (reader.result) handleScanImage(reader.result as string);
+            };
+        }
+    };
+
+    const handlePaste = (e: React.ClipboardEvent) => {
+        const items = e.clipboardData.items;
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+                const file = items[i].getAsFile();
+                if (file) {
+                    const reader = new FileReader();
+                    reader.readAsDataURL(file);
+                    reader.onload = () => {
+                        if (reader.result) handleScanImage(reader.result as string);
+                    };
+                }
+            }
         }
     };
 
@@ -307,35 +339,60 @@ export default function Clients() {
                                     <h4 className="text-sm font-bold text-gray-900">Brand Identity (DNA)</h4>
                                 </div>
 
-                                {/* AI Magic Fix */}
-                                <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-100 mb-4">
-                                    <label className="block text-xs font-bold text-indigo-700 mb-2 flex items-center gap-1">
-                                        <Sparkles size={12} />
-                                        AI Magic Fix
-                                    </label>
+                                {/* AI Brand Scanner */}
+                                <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4" onPaste={handlePaste}>
+                                    <div className="flex justify-between items-center mb-3">
+                                        <label className="text-sm font-bold text-indigo-700 flex items-center gap-1.5">
+                                            <Scan size={16} />
+                                            AI Brand Scanner
+                                        </label>
+                                        {isScanning && (
+                                            <span className="text-xs text-indigo-500 flex items-center gap-1 animate-pulse font-medium">
+                                                <Loader2 size={12} className="animate-spin" /> Analyzing...
+                                            </span>
+                                        )}
+                                    </div>
+
                                     <div className="flex gap-2">
-                                        <input
-                                            type="text"
-                                            className="flex-1 px-3 py-2 rounded-lg border border-indigo-200 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all bg-white text-brand-black placeholder-indigo-300"
-                                            placeholder="e.g. 'Make it look like a luxury hotel'"
-                                            value={fixInstruction}
-                                            onChange={(e) => setFixInstruction(e.target.value)}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    e.preventDefault();
-                                                    handleAutoFix();
-                                                }
-                                            }}
-                                        />
                                         <button
                                             type="button"
-                                            onClick={handleAutoFix}
-                                            disabled={isFixing || !fixInstruction.trim()}
-                                            className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                            onClick={handleScanUrl}
+                                            disabled={isScanning || !website}
+                                            className="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm"
                                         >
-                                            {isFixing ? <Loader2 size={16} className="animate-spin" /> : 'Fix'}
+                                            <Sparkles size={16} /> Scan URL
                                         </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => fileInputRef.current?.click()}
+                                            disabled={isScanning}
+                                            className="flex-1 px-4 py-2.5 bg-white text-indigo-600 border border-indigo-200 rounded-lg text-sm font-medium hover:bg-indigo-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm"
+                                        >
+                                            <ImageIcon size={16} /> Upload / Paste Screenshot
+                                        </button>
+                                        <input
+                                            type="file"
+                                            ref={fileInputRef}
+                                            className="hidden"
+                                            accept="image/*"
+                                            onChange={handleFileSelect}
+                                        />
                                     </div>
+
+                                    {/* Thumbnail Preview */}
+                                    {scannedImage && (
+                                        <div className="mt-3 relative inline-block">
+                                            <img src={scannedImage} alt="Scanned Brand" className="h-[72px] rounded border border-indigo-200 shadow-sm" />
+                                            <button
+                                                type="button"
+                                                onClick={() => setScannedImage(null)}
+                                                className="absolute -top-2 -right-2 bg-white text-red-500 rounded-full shadow border border-gray-100 p-1 hover:bg-red-50 hover:text-red-600 transition-colors"
+                                                title="Remove Image"
+                                            >
+                                                <Trash2 size={12} />
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Colors */}
