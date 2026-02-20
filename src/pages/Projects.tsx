@@ -158,12 +158,14 @@ export default function Projects() {
     const [generatedPrompt, setGeneratedPrompt] = useState('');
 
     // Firebase Config State
-    const [fbApiKey, setFbApiKey] = useState('');
-    const [fbAuthDomain, setFbAuthDomain] = useState('');
-    const [fbProjectId, setFbProjectId] = useState('');
-    const [fbStorageBucket, setFbStorageBucket] = useState('');
-    const [fbMessagingSenderId, setFbMessagingSenderId] = useState('');
-    const [fbAppId, setFbAppId] = useState('');
+    const [firebaseConfig, setFirebaseConfig] = useState({
+        apiKey: '',
+        authDomain: '',
+        projectId: '',
+        storageBucket: '',
+        messagingSenderId: '',
+        appId: ''
+    });
     // Computed
     const selectedClient = clients.find(c => c.id === selectedClientId);
     const appId = selectedClient
@@ -238,19 +240,19 @@ export default function Projects() {
 ### 6. INITIAL .ENV CONTENT
 \`\`\`env
 # Firebase Configuration
-VITE_FIREBASE_API_KEY=${fbApiKey || 'Pending'}
-VITE_FIREBASE_AUTH_DOMAIN=${fbAuthDomain || 'Pending'}
-VITE_FIREBASE_PROJECT_ID=${fbProjectId || 'Pending'}
-VITE_FIREBASE_STORAGE_BUCKET=${fbStorageBucket || 'Pending'}
-VITE_FIREBASE_MESSAGING_SENDER_ID=${fbMessagingSenderId || 'Pending'}
-VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
+VITE_FIREBASE_API_KEY=${firebaseConfig.apiKey || 'Pending'}
+VITE_FIREBASE_AUTH_DOMAIN=${firebaseConfig.authDomain || 'Pending'}
+VITE_FIREBASE_PROJECT_ID=${firebaseConfig.projectId || 'Pending'}
+VITE_FIREBASE_STORAGE_BUCKET=${firebaseConfig.storageBucket || 'Pending'}
+VITE_FIREBASE_MESSAGING_SENDER_ID=${firebaseConfig.messagingSenderId || 'Pending'}
+VITE_FIREBASE_APP_ID=${firebaseConfig.appId || 'Pending'}
 \`\`\`
             `.trim();
             setGeneratedPrompt(prompt);
         } else {
             setGeneratedPrompt('');
         }
-    }, [selectedClient, appId, appType, appName, fbApiKey, fbAuthDomain, fbProjectId, fbStorageBucket, fbMessagingSenderId, fbAppId]);
+    }, [selectedClient, appId, appType, appName, firebaseConfig]);
 
     const resetForm = () => {
         setSelectedClientId('');
@@ -260,12 +262,14 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
         setIncludeTasks(true);
         setAiModel('gemini-3-flash-preview'); // RESET MODEL
 
-        setFbApiKey('');
-        setFbAuthDomain('');
-        setFbProjectId('');
-        setFbStorageBucket('');
-        setFbMessagingSenderId('');
-        setFbAppId('');
+        setFirebaseConfig({
+            apiKey: '',
+            authDomain: '',
+            projectId: '',
+            storageBucket: '',
+            messagingSenderId: '',
+            appId: ''
+        });
     };
 
     const handleOpenWizard = () => {
@@ -292,14 +296,7 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
                 aiModel: aiModel, // SAVED: AI Brain Engine
                 createdAt: serverTimestamp(),
                 memory: fullSystemContext,
-                firebaseConfig: {
-                    apiKey: fbApiKey,
-                    authDomain: fbAuthDomain,
-                    projectId: fbProjectId,
-                    storageBucket: fbStorageBucket,
-                    messagingSenderId: fbMessagingSenderId,
-                    appId: fbAppId
-                }
+                firebaseConfig
             });
             setIsWizardOpen(false);
             resetForm();
@@ -690,8 +687,8 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
                                         <input
                                             type="text"
                                             className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none bg-gray-50"
-                                            value={fbApiKey}
-                                            onChange={(e) => setFbApiKey(e.target.value)}
+                                            value={firebaseConfig.apiKey}
+                                            onChange={(e) => setFirebaseConfig({ ...firebaseConfig, apiKey: e.target.value })}
                                         />
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
@@ -700,8 +697,8 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
                                             <input
                                                 type="text"
                                                 className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none bg-gray-50"
-                                                value={fbAuthDomain}
-                                                onChange={(e) => setFbAuthDomain(e.target.value)}
+                                                value={firebaseConfig.authDomain}
+                                                onChange={(e) => setFirebaseConfig({ ...firebaseConfig, authDomain: e.target.value })}
                                             />
                                         </div>
                                         <div>
@@ -709,8 +706,8 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
                                             <input
                                                 type="text"
                                                 className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none bg-gray-50"
-                                                value={fbProjectId}
-                                                onChange={(e) => setFbProjectId(e.target.value)}
+                                                value={firebaseConfig.projectId}
+                                                onChange={(e) => setFirebaseConfig({ ...firebaseConfig, projectId: e.target.value })}
                                             />
                                         </div>
                                     </div>
@@ -720,8 +717,8 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
                                             <input
                                                 type="text"
                                                 className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none bg-gray-50"
-                                                value={fbStorageBucket}
-                                                onChange={(e) => setFbStorageBucket(e.target.value)}
+                                                value={firebaseConfig.storageBucket}
+                                                onChange={(e) => setFirebaseConfig({ ...firebaseConfig, storageBucket: e.target.value })}
                                             />
                                         </div>
                                         <div>
@@ -729,8 +726,8 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
                                             <input
                                                 type="text"
                                                 className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none bg-gray-50"
-                                                value={fbMessagingSenderId}
-                                                onChange={(e) => setFbMessagingSenderId(e.target.value)}
+                                                value={firebaseConfig.messagingSenderId}
+                                                onChange={(e) => setFirebaseConfig({ ...firebaseConfig, messagingSenderId: e.target.value })}
                                             />
                                         </div>
                                     </div>
@@ -739,8 +736,8 @@ VITE_FIREBASE_APP_ID=${fbAppId || 'Pending'}
                                         <input
                                             type="text"
                                             className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none bg-gray-50"
-                                            value={fbAppId}
-                                            onChange={(e) => setFbAppId(e.target.value)}
+                                            value={firebaseConfig.appId}
+                                            onChange={(e) => setFirebaseConfig({ ...firebaseConfig, appId: e.target.value })}
                                         />
                                     </div>
                                 </div>

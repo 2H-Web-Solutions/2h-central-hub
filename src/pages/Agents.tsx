@@ -4,6 +4,7 @@ import { db } from '../lib/firebase';
 import DashboardShell from '../components/DashboardShell';
 import SidebarNav from '../components/SidebarNav';
 import { Bot, Send, Sparkles, LayoutGrid } from 'lucide-react';
+import { formatAppId } from '../lib/utils';
 
 interface Session {
     id: string;
@@ -21,13 +22,7 @@ interface Message {
     createdAt: Timestamp;
 }
 
-const formatAppId = (appId: string) => {
-    return (appId || 'Unknown App')
-        .replace(/^2h_/, '')
-        .replace(/_v\d+$/, '')
-        .replace(/_/g, ' ')
-        .replace(/\b\w/g, c => c.toUpperCase());
-};
+
 
 export default function Agents() {
     // State

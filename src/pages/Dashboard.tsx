@@ -4,6 +4,7 @@ import { db } from '../lib/firebase';
 import Button from '../components/Button';
 import DashboardShell from '../components/DashboardShell';
 import SidebarNav from '../components/SidebarNav';
+import { formatAppId } from '../lib/utils';
 
 interface Task {
     id: string;
@@ -13,13 +14,7 @@ interface Task {
     sourceAppId?: string;
 }
 
-const formatAppId = (appId: string) => {
-    return appId
-        .replace(/^2h_/, '')            // Remove prefix
-        .replace(/_v\d+$/, '')          // Remove version suffix
-        .replace(/_/g, ' ')             // Replace underscores with spaces
-        .replace(/\b\w/g, c => c.toUpperCase()); // Capitalize words
-};
+
 
 export default function Dashboard() {
     const [stats, setStats] = useState({
