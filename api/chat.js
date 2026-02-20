@@ -233,6 +233,7 @@ export default async function handler(req, res) {
     let currentResponse = response;
     let turnCount = 0;
     const MAX_TURNS = 5;
+    let toolCallLogs = [];
 
     while (currentResponse.functionCalls() && currentResponse.functionCalls().length > 0 && turnCount < MAX_TURNS) {
       const call = currentResponse.functionCalls()[0];
@@ -242,6 +243,7 @@ export default async function handler(req, res) {
 
         // Execute Tool
         const fileContent = await fetchGithubFile(repoUrl, call.args.filePath);
+        toolCallLogs.push(`Read ${call.args.filePath}: ${fileContent.startsWith('Error') ? 'Failed' : 'Success'}`);
 
         // Send Response back to model
         const toolResult = await chat.sendMessage([
@@ -263,7 +265,18 @@ export default async function handler(req, res) {
     }
 
     // Default response if no tool called or after all tool calls finish
-    return res.status(200).json({ reply: safeGetText(currentResponse) });
+    let finalReply = null;
+    try {
+      finalReply = currentResponse.text();
+    } catch (e) { /* ignore */ }
+
+    if (!finalReply && toolCallLogs.length > 0) {
+      finalReply = `System: The AI processed the following files but didn't generate a text response:\n- ${toolCallLogs.join('\n- ')}`;
+    } else if (!finalReply) {
+      finalReply = safeGetText(currentResponse);
+    }
+
+    return res.status(200).json({ reply: finalReply });
 
   } catch (error) {
     console.error('Gemini API Error:', error);
