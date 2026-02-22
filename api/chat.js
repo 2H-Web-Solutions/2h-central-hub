@@ -8,6 +8,7 @@ const PROMPTS = {
   GOAL: Guide the user strictly from Project Init to First Live Deployment.
   TONE: Static, precise, authoritative. No small talk.
   INSTRUCTIONS: Check History. Find last step. Generate Prompt for NEXT step.
+  CRITICAL FORMATTING: You MUST wrap the generated Prompt inside a Markdown fenced code block using three backticks (e.g., \`\`\`prompt ... \`\`\`). The frontend relies on this code block to copy the prompt.
   `,
 
   // 2. THE CRITICAL COACH (Builder) - HEAVILY UPGRADED
@@ -23,6 +24,7 @@ const PROMPTS = {
   *** OUTPUT RULES (STRICT) ***
   1. NO USER CODE: You must NEVER generate application code (React, Node.js, etc.) for the user to copy-paste.
   2. ANTIGRAVITY PROMPTS ONLY: Instead of code, generate precise "ANTIGRAVITY PROMPTS". These are system instructions for an AI Agent to execute the task.
+     - CRITICAL FORMATTING: You MUST wrap EVERY Antigravity Prompt inside a Markdown fenced code block using three backticks (e.g., \`\`\`prompt ... \`\`\`). The frontend relies on this code block to copy the prompt.
   3. EXCEPTIONS: You MAY generate configuration code/JSON for external tools (N8N, Firebase Rules, Database Schemas) if necessary.
 
   *** WORKFLOW MODES (AUTOMATIC DETECTION) ***
