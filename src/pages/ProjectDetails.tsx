@@ -682,7 +682,7 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                                 onChange={(e) => handleUpdateField('aiModel', e.target.value)}
                             >
                                 <option value="gemini-3-flash-preview">⚡ Gemini 3 Flash (Standard)</option>
-                                <option value="gemini-3-pro-preview">🧠 Gemini 3 Pro (Smart)</option>
+                                <option value="gemini-3.1-pro-preview">🧠 Gemini 3.1 Pro (Vorabversion)</option>
                             </select>
                         </div>
                     </div>

@@ -78,9 +78,9 @@ const GLOBAL_RULES = `
    - Server-Side (n8n/Vercel): Use Service Accounts/API Keys stored in Env Vars.
    - Error Handling: Fail gracefully. If n8n doesn't respond, show UI feedback.
 
-6. AI ENGINE STANDARDS (GEMINI 3 PROTOCOL)
+6. AI ENGINE STANDARDS (GEMINI 3.1 PROTOCOL)
    - STANDARD MODEL: 'gemini-3-flash-preview'. Use this for 90% of apps (Reports, Dashboards, CRUD). It is fast and cheap.
-   - PRO MODEL: 'gemini-3-pro-preview'. Use ONLY if the app requires:
+   - PRO MODEL: 'gemini-3.1-pro-preview'. Use ONLY if the app requires:
      a) Complex Autonomous Agents.
      b) Deep Reasoning/Coding capabilities.
      c) Heavy Multimodal Analysis.

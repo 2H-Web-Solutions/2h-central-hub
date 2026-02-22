@@ -180,9 +180,14 @@ export default async function handler(req, res) {
         NOTE: You have access to tools. If you need to read a file from the repository to answer the user's request, USE THE TOOL 'read_github_file'. don't guess.
     `;
 
-    // *** GEMINI 3 STRICT MODEL SELECTION ***
-    const allowedModels = ['gemini-3-flash-preview', 'gemini-3-pro-preview'];
-    const selectedModel = allowedModels.includes(aiModel) ? aiModel : 'gemini-3-flash-preview';
+    // *** GEMINI 3.1 STRICT MODEL SELECTION ***
+    const allowedModels = ['gemini-3-flash-preview', 'gemini-3.1-pro-preview'];
+    let selectedModel = allowedModels.includes(aiModel) ? aiModel : 'gemini-3-flash-preview';
+
+    // Auto-map to customtools variant for agent-based execution
+    if (selectedModel === 'gemini-3.1-pro-preview') {
+      selectedModel = 'gemini-3.1-pro-preview-customtools';
+    }
 
     const model = genAI.getGenerativeModel({
       model: selectedModel,
