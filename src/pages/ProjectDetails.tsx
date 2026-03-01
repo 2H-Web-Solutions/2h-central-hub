@@ -30,6 +30,7 @@ interface Project {
     agentMode?: 'STARTER' | 'BUILDER' | 'SOLVER';
     name?: string;
     aiModel?: string;
+    language?: 'en' | 'de';
 }
 
 interface ChatMessage {
@@ -141,6 +142,7 @@ export default function ProjectDetails() {
     const [chatInput, setChatInput] = useState('');
     const [isThinking, setIsThinking] = useState(false);
     const [agentMode, setAgentMode] = useState<'STARTER' | 'BUILDER' | 'SOLVER'>('BUILDER');
+    const [language, setLanguage] = useState<'de' | 'en'>('de');
     const [attachments, setAttachments] = useState<string[]>([]);
     const [viewMode, setViewMode] = useState<'chat' | 'code'>('chat');
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -175,6 +177,10 @@ export default function ProjectDetails() {
                 // Sync Agent Mode from Project (Persistence)
                 if (data.agentMode) {
                     setAgentMode(data.agentMode as 'STARTER' | 'BUILDER' | 'SOLVER');
+                }
+
+                if (data.language) {
+                    setLanguage(data.language as 'en' | 'de');
                 }
 
                 setLoading(false);
@@ -305,6 +311,17 @@ export default function ProjectDetails() {
             await updateDoc(docRef, { agentMode: newMode });
         } catch (error) {
             console.error("Error updating agent mode:", error);
+        }
+    };
+
+    const handleLanguageChange = async (newLang: 'de' | 'en') => {
+        setLanguage(newLang);
+        if (!projectId) return;
+        try {
+            const docRef = doc(db, 'apps', '2h_hub_v1', 'projects', projectId);
+            await updateDoc(docRef, { language: newLang });
+        } catch (error) {
+            console.error("Error updating language:", error);
         }
     };
 
@@ -448,7 +465,8 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                     // NOTE: Real multimodal support would require sending the Base64 in a specific format to the API. 
                     // For now, we assume text-based context or that the API ignores images if not supported.
                     // If you want actual Vision capabilities, you'd insert the image data here.
-                    images: currentAttachments
+                    images: currentAttachments,
+                    language: language
                 })
             });
 
@@ -992,6 +1010,24 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                                     title="Solver (Debugger)"
                                 >
                                     <Bug size={16} />
+                                </button>
+                            </div>
+
+                            {/* Language Switcher */}
+                            <div className="flex bg-gray-100 p-1 rounded-lg text-xs font-bold">
+                                <button
+                                    onClick={() => handleLanguageChange('de')}
+                                    className={`px-2 py-1 rounded-md transition-all ${language === 'de' ? 'bg-white text-brand-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                                    title="German"
+                                >
+                                    DE
+                                </button>
+                                <button
+                                    onClick={() => handleLanguageChange('en')}
+                                    className={`px-2 py-1 rounded-md transition-all ${language === 'en' ? 'bg-white text-brand-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                                    title="English"
+                                >
+                                    EN
                                 </button>
                             </div>
 
