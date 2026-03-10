@@ -59,6 +59,7 @@ const GLOBAL_RULES = `
    - Scope: ALL data must be stored under 'apps/{APP_ID}/...'.
    - Root Access: NEVER write to the root of Firestore.
    - Auth: Use Firebase Client SDK (Anonymous or User).
+   - Document IDs: ALWAYS use human-readable, slugified strings as Document IDs (e.g. \`setDoc(doc(db, 'apps/id/clients', 'mcdonalds_gmbh'), {})\`) instead of auto-generated random string IDs (\`addDoc\`).
    - Security Rule Target: "match /apps/{appId}/{document=**} { allow read, write: if request.auth != null; }"
 
 3. DEPLOYMENT WORKFLOW (ANTIGRAVITY -> GITHUB -> VERCEL)
@@ -237,7 +238,7 @@ export default function Projects() {
 **4. DEPLOYMENT**
 *   **GitHub:** TBD
 
-### 6. INITIAL .ENV CONTENT
+### 5. INITIAL .ENV CONTENT
 \`\`\`env
 # Firebase Configuration
 VITE_FIREBASE_API_KEY=${firebaseConfig.apiKey || 'Pending'}
@@ -248,21 +249,6 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=${firebaseConfig.messagingSenderId || 'Pending
 VITE_FIREBASE_APP_ID=${firebaseConfig.appId || 'Pending'}
 \`\`\`
 
-### 7. ARCHITECT (STARTER) 10-STEP PROTOCOL & UI RULES
-Wenn du im Modus "STARTER" bist, bist du der Architekt. Deine einzige Aufgabe ist es, das App-Fundament aufzubauen. Arbeite strikt diesen Plan ab und nenne dem User immer deinen aktuellen Schritt:
-- Schritt 1: Dependencies (React Router, Firebase, Lucide, Markdown) installieren.
-- Schritt 2: Tailwind DNA (Hex Codes aus Punkt 2) in tailwind.config.js & index.css verankern.
-- Schritt 3: Firebase Connector (src/lib/firebase.ts) aufsetzen.
-- Schritt 4: Das 2H-Shell Layout (Sidebar, Header, DashboardShell) generieren.
-- Schritt 5: ZWINGENDE UI-REGELN integrieren: 
-  a) Jedes Code-/Datenfeld braucht einen Copy-to-Clipboard Button oben rechts. 
-  b) Chat-Eingaben senden bei "Ctrl+Enter", "Enter" macht einen Zeilenumbruch. 
-  c) Image-Uploads (Screenshots) werden direkt als Base64-Strings ans Frontend/KI übergeben, NICHT in den Firebase Storage laden!
-- Schritt 6: Global Task Sync Route einbauen (falls aktiviert).
-- Schritt 7: React Router Setup (App.tsx) mit Platzhalter-Seiten.
-- Schritt 8: Saubere .gitignore erstellen.
-- Schritt 9: vercel.json für SPA-Rewrites anlegen.
-- Schritt 10: Bestätigen, dass das Fundament steht und Übergabe an den "BUILDER" Modus empfehlen.
             `.trim();
             setGeneratedPrompt(prompt);
         } else {
