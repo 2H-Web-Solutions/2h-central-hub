@@ -155,7 +155,7 @@ export default function Projects() {
     const [appType, setAppType] = useState('Custom App');
     const [version, setVersion] = useState('v1');
     const [includeTasks, setIncludeTasks] = useState(true);
-    const [aiModel, setAiModel] = useState('gemini-3-flash-preview'); // NEW: AI Model State
+    const [aiModel, setAiModel] = useState('gemini-3.1-flash-lite-preview'); // NEW: AI Model State
     const [generatedPrompt, setGeneratedPrompt] = useState('');
 
     // Firebase Config State
@@ -262,7 +262,7 @@ VITE_FIREBASE_APP_ID=${firebaseConfig.appId || 'Pending'}
         setAppType('Custom App');
         setVersion('v1');
         setIncludeTasks(true);
-        setAiModel('gemini-3-flash-preview'); // RESET MODEL
+        setAiModel('gemini-3.1-flash-lite-preview'); // RESET MODEL
 
         setFirebaseConfig({
             apiKey: '',

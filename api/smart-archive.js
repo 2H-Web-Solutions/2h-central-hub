@@ -17,9 +17,9 @@ export default async function handler(req, res) {
 
         if (!apiKey) return res.status(500).json({ error: 'Missing API Key' });
 
-        // 2. Initialize Gemini (Gemini 3 Flash for speed)
+        // 2. Initialize Gemini (Gemini 3.1 Flash-Lite for speed)
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite-preview' });
 
         // 3. Construct the Archiver Prompt
         const prompt = `
@@ -38,7 +38,7 @@ export default async function handler(req, res) {
         3. Remove completed To-Dos. Add new To-Dos if mentioned.
         4. Keep the structure clean (Markdown).
         5. OUTPUT ONLY THE NEW DOCUMENTATION TEXT. NO CHAT.
-        6. FACT CHECK: If the chat contains hallucinations (e.g. "Gemini 3 unavailable"), DO NOT archive them. Archive the CORRECTION instead ("Gemini 3 activated").
+        6. FACT CHECK: If the chat contains hallucinations (e.g. "Gemini 3 unavailable"), DO NOT archive them. Archive the CORRECTION instead ("Gemini 3.1 activated").
         `;
 
         // 4. Generate

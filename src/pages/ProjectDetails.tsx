@@ -459,7 +459,7 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                     context: combinedContext,
                     agent: agentMode === 'STARTER' ? 'Architect' : agentMode === 'BUILDER' ? 'Builder' : 'Fixer',
                     agentMode: agentMode,
-                    aiModel: project?.aiModel || 'gemini-3-flash-preview',
+                    aiModel: project?.aiModel || 'gemini-3.1-flash-lite-preview',
                     history: messages.map(m => ({ role: m.role, content: m.content })),
                     repoUrl: githubUrl || null,
                     // NOTE: Real multimodal support would require sending the Base64 in a specific format to the API. 
@@ -696,10 +696,10 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                             </label>
                             <select
                                 className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none bg-gray-50 font-mono text-xs"
-                                value={project?.aiModel || 'gemini-3-flash-preview'}
+                                value={project?.aiModel || 'gemini-3.1-flash-lite-preview'}
                                 onChange={(e) => handleUpdateField('aiModel', e.target.value)}
                             >
-                                <option value="gemini-3-flash-preview">⚡ Gemini 3 Flash (Standard)</option>
+                                <option value="gemini-3.1-flash-lite-preview">⚡ Gemini 3.1 Flash-Lite (Standard)</option>
                                 <option value="gemini-3.1-pro-preview">🧠 Gemini 3.1 Pro (Vorabversion)</option>
                             </select>
                         </div>

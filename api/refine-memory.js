@@ -12,7 +12,7 @@ export default async function handler(req, res) {
         const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
         const genAI = new GoogleGenerativeAI(apiKey);
         // Use Flash for handling large text quickly
-        const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite-preview' });
 
         const prompt = `
         ROLE: Technical Documentation Editor.
@@ -22,13 +22,13 @@ export default async function handler(req, res) {
         ${currentMemory}
 
         UNIVERSAL TRUTHS (These are FACTS. If Memory says otherwise, correct it):
-        1. AI Model: Gemini 3 Flash/Pro is ACTIVE and AVAILABLE. (Remove "not found" errors).
+        1. AI Model: Gemini 3.1 Flash-Lite/Pro is ACTIVE and AVAILABLE. (Remove "not found" errors).
         2. Tech Stack: React + Vite + Tailwind + Firebase + Vercel Serverless.
         3. Workflow: "Deployment First" is the standard.
 
         INSTRUCTIONS:
         1. PRESERVE HISTORY: Keep the log of what features were built and when.
-        2. FIX ERRORS: If the log says "Failed to use Gemini 3", add a note " [FIXED: Gemini 3 Active]".
+        2. FIX ERRORS: If the log says "Failed to use Gemini 3", add a note " [FIXED: Gemini 3.1 Active]".
         3. MERGE DUPLICATES: If the same rule appears 3 times, keep it once.
         4. FORMAT: Return clean, structured Markdown.
         `;

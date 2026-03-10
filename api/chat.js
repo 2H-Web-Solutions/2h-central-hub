@@ -175,7 +175,7 @@ export default async function handler(req, res) {
     const UNIVERSAL_TRUTH = `
     *** UNIVERSAL FACTS (OVERRIDE ALL HISTORY) ***
     - Current Date: ${new Date().toISOString()}
-    - AI Model Standard: Gemini 3 Flash / Pro (Preview) is ACTIVE and STANDARD.
+    - AI Model Standard: Gemini 3.1 Flash-Lite / Pro (Preview) is ACTIVE and STANDARD.
     - Tech Stack: React 18, Vite, Tailwind, Firebase 10 (Modular), Vercel Serverless.
     - If history says "Gemini 3 not found", IT IS WRONG. Correct it immediately.
     `;
@@ -200,8 +200,8 @@ export default async function handler(req, res) {
     `;
 
     // *** GEMINI 3.1 STRICT MODEL SELECTION ***
-    const allowedModels = ['gemini-3-flash-preview', 'gemini-3.1-pro-preview'];
-    let selectedModel = allowedModels.includes(aiModel) ? aiModel : 'gemini-3-flash-preview';
+    const allowedModels = ['gemini-3.1-flash-lite-preview', 'gemini-3.1-pro-preview'];
+    let selectedModel = allowedModels.includes(aiModel) ? aiModel : 'gemini-3.1-flash-lite-preview';
 
     // Auto-map to customtools variant for agent-based execution
     if (selectedModel === 'gemini-3.1-pro-preview') {
