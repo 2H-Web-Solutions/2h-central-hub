@@ -201,7 +201,7 @@ export default async function handler(req, res) {
 
     // *** GEMINI 3.1 STRICT MODEL SELECTION ***
     const allowedModels = ['gemini-3.1-flash-lite-preview', 'gemini-3.1-pro-preview'];
-    let selectedModel = allowedModels.includes(aiModel) ? aiModel : 'gemini-3.1-flash-lite-preview';
+    let selectedModel = allowedModels.includes(aiModel) ? aiModel : 'gemini-3.1-pro-preview';
 
     // Auto-map to customtools variant for agent-based execution
     if (selectedModel === 'gemini-3.1-pro-preview') {

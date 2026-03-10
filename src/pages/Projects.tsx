@@ -80,8 +80,8 @@ const GLOBAL_RULES = `
    - Error Handling: Fail gracefully. If n8n doesn't respond, show UI feedback.
 
 6. AI ENGINE STANDARDS (GEMINI 3.1 PROTOCOL)
-   - STANDARD MODEL: 'gemini-3-flash-preview'. Use this for 90% of apps (Reports, Dashboards, CRUD). It is fast and cheap.
-   - PRO MODEL: 'gemini-3.1-pro-preview'. Use ONLY if the app requires:
+   - STANDARD MODEL: 'gemini-3.1-pro-preview'. Use this for Architect, Builder, and Solver logic (Complex Agents).
+   - LITE MODEL: 'gemini-3.1-flash-lite-preview'. Use ONLY for fast, cheap bulk operations or simple reports.
      a) Complex Autonomous Agents.
      b) Deep Reasoning/Coding capabilities.
      c) Heavy Multimodal Analysis.
@@ -155,7 +155,7 @@ export default function Projects() {
     const [appType, setAppType] = useState('Custom App');
     const [version, setVersion] = useState('v1');
     const [includeTasks, setIncludeTasks] = useState(true);
-    const [aiModel, setAiModel] = useState('gemini-3.1-flash-lite-preview'); // NEW: AI Model State
+    const [aiModel, setAiModel] = useState('gemini-3.1-pro-preview'); // NEW: AI Model State
     const [generatedPrompt, setGeneratedPrompt] = useState('');
 
     // Firebase Config State
@@ -262,7 +262,7 @@ VITE_FIREBASE_APP_ID=${firebaseConfig.appId || 'Pending'}
         setAppType('Custom App');
         setVersion('v1');
         setIncludeTasks(true);
-        setAiModel('gemini-3.1-flash-lite-preview'); // RESET MODEL
+        setAiModel('gemini-3.1-pro-preview'); // RESET MODEL
 
         setFirebaseConfig({
             apiKey: '',
