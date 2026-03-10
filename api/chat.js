@@ -154,7 +154,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') { return res.status(405).json({ error: 'Method not allowed' }); }
 
   try {
-    const { message, context, history, agentMode, aiModel, repoUrl, language } = req.body;
+    const { message, context, history, agentMode, aiModel, repoUrl, language, images } = req.body;
     const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
     if (!apiKey) return res.status(500).json({ error: 'Missing API Key' });
 
@@ -203,6 +203,11 @@ export default async function handler(req, res) {
     const allowedModels = ['gemini-3.1-flash-lite-preview', 'gemini-3.1-pro-preview'];
     let selectedModel = allowedModels.includes(aiModel) ? aiModel : 'gemini-3.1-pro-preview';
 
+    // Force gemini-3.1-pro-preview for ARCHITECT and BUILDER
+    if (selectedMode === 'STARTER' || selectedMode === 'BUILDER') {
+      selectedModel = 'gemini-3.1-pro-preview';
+    }
+
     // Auto-map to customtools variant for agent-based execution
     if (selectedModel === 'gemini-3.1-pro-preview') {
       selectedModel = 'gemini-3.1-pro-preview-customtools';
@@ -230,8 +235,25 @@ export default async function handler(req, res) {
       history: chatHistory
     });
 
+    // Prepare message parts including potential images
+    let messageParts = [{ text: message }];
+
+    if (images && Array.isArray(images)) {
+      images.forEach(img => {
+        const match = img.match(/^data:(.*?);base64,(.*)$/);
+        if (match) {
+          messageParts.push({
+            inlineData: {
+              mimeType: match[1],
+              data: match[2]
+            }
+          });
+        }
+      });
+    }
+
     // Send Message
-    const result = await chat.sendMessage(message);
+    const result = await chat.sendMessage(messageParts);
     const response = await result.response;
 
     // handle function calls (single turn for now, simple implementation)
