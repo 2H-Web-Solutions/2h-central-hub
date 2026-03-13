@@ -221,7 +221,7 @@ export default async function handler(req, res) {
       systemInstruction: systemInstruction,
       tools: tools,
       generationConfig: {
-        temperature: 1.0,
+        temperature: 0.4,
         maxOutputTokens: 8192,
       }
     });
@@ -323,6 +323,14 @@ export default async function handler(req, res) {
       finalReply = `System: The AI processed the following files but didn't generate a text response:\n- ${toolCallLogs.join('\n- ')}`;
     } else if (!finalReply) {
       finalReply = safeGetText(currentResponse);
+    }
+
+    // Filter out internal thought blocks (e.g., "묵thought ...", "<thought>...")
+    // This removes everything from "묵thought" (or similar) up to the next proper paragraph, 
+    // or just strips out common thinking tokens if the model leaks them.
+    if (finalReply) {
+      finalReply = finalReply.replace(/묵?thought[\s\S]*?(?=\n\n(?:[^a-z(]|$))/g, '').trim();
+      finalReply = finalReply.replace(/<thought>[\s\S]*?<\/thought>/g, '').trim();
     }
 
     return res.status(200).json({ reply: finalReply });
