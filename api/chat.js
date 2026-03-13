@@ -132,7 +132,7 @@ const fetchGithubFile = async (repoUrl, filePath) => {
     });
 
     if (!response.ok) {
-      if (response.status === 404) return `Error: File '${filePath}' not found in repository.`;
+      if (response.status === 404) return `Error: File '${filePath}' not found in repository. Tell the user about this error and ask if the path is correct.`;
       return `Error: GitHub API responded with ${response.status} ${response.statusText}`;
     }
 
@@ -197,6 +197,9 @@ export default async function handler(req, res) {
         ${context || 'No specific context.'}
 
         NOTE: You have access to tools. If you need to read a file from the repository to answer the user's request, USE THE TOOL 'read_github_file'. don't guess.
+        
+        *** TOOL ERROR PROTOCOL ***
+        If a tool returns an error (e.g., "File not found"), you MUST NOT stop or return an empty text. You MUST generate a text response acknowledging the error and tell the user what you need or what you will do next. NEVER return an empty response after a tool error.
     `;
 
     // *** GEMINI 3.1 STRICT MODEL SELECTION ***
