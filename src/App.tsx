@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import Clients from './pages/Clients';
 import Tasks from './pages/Tasks';
@@ -8,7 +8,7 @@ import ProjectDetails from './pages/ProjectDetails';
 
 import { Toaster } from 'react-hot-toast';
 
-function AppContent() {
+function App() {
     return (
         <>
             <Toaster position="top-right" />
@@ -21,14 +21,6 @@ function AppContent() {
                 <Route path="/projects/:projectId" element={<ProjectDetails />} />
             </Routes>
         </>
-    );
-}
-
-function App() {
-    return (
-        <Router>
-            <AppContent />
-        </Router>
     );
 }
 
