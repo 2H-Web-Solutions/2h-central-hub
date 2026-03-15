@@ -344,7 +344,7 @@ export default function ProjectDetails() {
         }
     };
 
-    const handleCopyEnv = () => {
+    const handleCopyEnv = async () => {
         const envContent = `VITE_FIREBASE_API_KEY=${apiKey}
 VITE_FIREBASE_AUTH_DOMAIN=${authDomain}
 VITE_FIREBASE_PROJECT_ID=${fbProjectId}
@@ -352,8 +352,26 @@ VITE_FIREBASE_STORAGE_BUCKET=${storageBucket}
 VITE_FIREBASE_MESSAGING_SENDER_ID=${messagingSenderId}
 VITE_FIREBASE_APP_ID=${fbAppId}`;
 
-        navigator.clipboard.writeText(envContent);
-        toast.success("Copied .env block!");
+        try {
+            await navigator.clipboard.writeText(envContent);
+            toast.success("Copied .env block!");
+        } catch (err) {
+            console.warn('Clipboard API failed, trying fallback...', err);
+            try {
+                const textArea = document.createElement("textarea");
+                textArea.value = envContent;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand("copy");
+                document.body.removeChild(textArea);
+                toast.success("Copied .env block!");
+            } catch (fallbackErr) {
+                console.error('Copy failed completely:', fallbackErr);
+                toast.error("Copy failed. Please select text manually.");
+            }
+        }
     };
 
     // --- FILE HANDLING ---
