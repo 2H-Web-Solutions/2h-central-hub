@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, onSnapshot, updateDoc, collection, addDoc, serverTimestamp, query, orderBy, getDocs, writeBatch } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, collection, addDoc, serverTimestamp, query, orderBy, getDocs, writeBatch, deleteDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import DashboardShell from '../components/DashboardShell';
 import SidebarNav from '../components/SidebarNav';
@@ -527,6 +527,20 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
     };
 
     // --- CHAT MANAGEMENT ---
+
+    const handleDeleteMessage = async (messageId: string) => {
+        if (!projectId) return;
+        if (!window.confirm("Are you sure you want to delete this message?")) return;
+        
+        try {
+            const msgRef = doc(db, 'apps', '2h_hub_v1', 'projects', projectId, 'chat', messageId);
+            await deleteDoc(msgRef);
+            toast.success("Message deleted");
+        } catch (error) {
+            console.error("Error deleting message:", error);
+            toast.error("Failed to delete message");
+        }
+    };
 
     const handleSmartArchive = async () => {
         if (!projectId || !project) return;
@@ -1102,8 +1116,17 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                                     {messages.map((msg) => (
                                         <div
                                             key={msg.id}
-                                            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} group items-start gap-2`}
                                         >
+                                            {msg.role === 'user' && (
+                                                <button
+                                                    onClick={() => handleDeleteMessage(msg.id)}
+                                                    className="p-1.5 text-gray-400 hover:text-red-500 bg-white shadow-sm border border-gray-100 rounded-full opacity-0 group-hover:opacity-100 transition-all mt-1 flex-shrink-0"
+                                                    title="Delete message"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            )}
                                             <div
                                                 className={`max-w-[80%] px-5 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${msg.role === 'user'
                                                     ? 'bg-[#B7EF02] text-brand-black rounded-tr-none font-medium'
@@ -1142,6 +1165,15 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                                                     {msg.content}
                                                 </ReactMarkdown>
                                             </div>
+                                            {msg.role !== 'user' && (
+                                                <button
+                                                    onClick={() => handleDeleteMessage(msg.id)}
+                                                    className="p-1.5 text-gray-400 hover:text-red-500 bg-white shadow-sm border border-gray-100 rounded-full opacity-0 group-hover:opacity-100 transition-all mt-1 flex-shrink-0"
+                                                    title="Delete message"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            )}
                                         </div>
                                     ))}
                                     {isThinking && (

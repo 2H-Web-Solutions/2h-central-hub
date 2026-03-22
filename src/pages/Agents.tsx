@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, collectionGroup, addDoc, onSnapshot, serverTimestamp, query, orderBy, Timestamp, DocumentReference, updateDoc } from 'firebase/firestore';
+import { collection, collectionGroup, addDoc, onSnapshot, serverTimestamp, query, orderBy, Timestamp, DocumentReference, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import DashboardShell from '../components/DashboardShell';
 import SidebarNav from '../components/SidebarNav';
-import { Bot, Send, Sparkles, LayoutGrid } from 'lucide-react';
+import { Bot, Send, Sparkles, LayoutGrid, Trash2 } from 'lucide-react';
 import { formatAppId } from '../lib/utils';
 
 interface Session {
@@ -116,6 +116,19 @@ export default function Agents() {
         }
     };
 
+    const handleDeleteMessage = async (messageId: string) => {
+        if (!activeSession) return;
+        if (!window.confirm("Are you sure you want to delete this message?")) return;
+        
+        try {
+            const msgRef = doc(activeSession.ref, 'messages', messageId);
+            await deleteDoc(msgRef);
+        } catch (error) {
+            console.error("Error deleting message:", error);
+            alert("Failed to delete message.");
+        }
+    };
+
     return (
         <DashboardShell
             headerTitle="Agent Mission Control"
@@ -194,9 +207,18 @@ export default function Agents() {
                                 {messages.map((msg) => (
                                     <div
                                         key={msg.id}
-                                        className={`flex w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                        className={`flex w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'} group items-start gap-2`}
                                     >
-                                        <div className={`flex flex-col max-w-[70%] group ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                                        {msg.role === 'user' && (
+                                            <button
+                                                onClick={() => handleDeleteMessage(msg.id)}
+                                                className="p-1.5 text-gray-400 hover:text-red-500 bg-white shadow-sm border border-gray-100 rounded-full opacity-0 group-hover:opacity-100 transition-all mt-1 flex-shrink-0"
+                                                title="Delete message"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        )}
+                                        <div className={`flex flex-col max-w-[70%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                                             <div
                                                 className={`px-6 py-4 rounded-2xl text-sm leading-relaxed shadow-sm transition-all ${msg.role === 'user'
                                                     ? 'bg-[#B7EF02] text-brand-black rounded-tr-none hover:shadow-md'
@@ -209,6 +231,15 @@ export default function Agents() {
                                                 {msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
                                             </span>
                                         </div>
+                                        {msg.role !== 'user' && (
+                                            <button
+                                                onClick={() => handleDeleteMessage(msg.id)}
+                                                className="p-1.5 text-gray-400 hover:text-red-500 bg-white shadow-sm border border-gray-100 rounded-full opacity-0 group-hover:opacity-100 transition-all mt-1 flex-shrink-0"
+                                                title="Delete message"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        )}
                                     </div>
                                 ))}
                                 <div ref={messagesEndRef} />
