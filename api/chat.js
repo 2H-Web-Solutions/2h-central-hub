@@ -282,34 +282,38 @@ export default async function handler(req, res) {
     // Start conversation loop to handle multiple tool hops
     let currentResponse = response;
     let turnCount = 0;
-    const MAX_TURNS = 10;
+    const MAX_TURNS = 15;
     let toolCallLogs = [];
 
     while (currentResponse.functionCalls() && currentResponse.functionCalls().length > 0 && turnCount < MAX_TURNS) {
-      const call = currentResponse.functionCalls()[0];
-
-      if (call.name === 'read_github_file') {
-        console.log(`[Tool] Reading file: ${call.args.filePath}`);
-
-        // Execute Tool
-        const fileContent = await fetchGithubFile(repoUrl, call.args.filePath);
-        toolCallLogs.push(`Read ${call.args.filePath}: ${fileContent.startsWith('Error') ? 'Failed' : 'Success'}`);
-
-        // Send Response back to model
-        const toolResult = await chat.sendMessage([
-          {
+      const calls = currentResponse.functionCalls();
+      
+      const functionResponses = await Promise.all(calls.map(async (call) => {
+        if (call.name === 'read_github_file') {
+          console.log(`[Tool] Reading file: ${call.args.filePath}`);
+          const fileContent = await fetchGithubFile(repoUrl, call.args.filePath);
+          toolCallLogs.push(`Read ${call.args.filePath}: ${fileContent.startsWith('Error') ? 'Failed' : 'Success'}`);
+          
+          return {
             functionResponse: {
               name: 'read_github_file',
               response: { content: fileContent }
             }
-          }
-        ]);
+          };
+        } else {
+          console.warn(`[Tool] Unknown function call: ${call.name}`);
+          return {
+            functionResponse: {
+              name: call.name,
+              response: { error: "Unknown function call" }
+            }
+          };
+        }
+      }));
 
-        currentResponse = await toolResult.response;
-      } else {
-        console.warn(`[Tool] Unknown function call: ${call.name}`);
-        break; // Stop if it tries to call a tool we didn't provide
-      }
+      // Send ALL Responses back to model
+      const toolResult = await chat.sendMessage(functionResponses);
+      currentResponse = await toolResult.response;
 
       turnCount++;
     }
