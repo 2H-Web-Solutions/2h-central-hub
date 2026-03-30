@@ -485,9 +485,9 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
 
             const data = await response.json();
 
-            // Save chunks to Firestore in batches of 450 to avoid "Transaction too big" errors (Firebase limit is 500)
+            // Save chunks to Firestore in batches of 50 to strictly avoid "Transaction too big" metadata/size errors.
             const datasetColl = collection(db, 'apps', '2h_hub_v1', 'projects', projectId, 'datasets');
-            const BATCH_SIZE = 450;
+            const BATCH_SIZE = 50;
             
             for (let i = 0; i < data.chunks.length; i += BATCH_SIZE) {
                 const batch = writeBatch(db);
