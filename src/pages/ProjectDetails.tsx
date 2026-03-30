@@ -485,24 +485,23 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
 
             const data = await response.json();
 
-            // Save chunks to Firestore in batches of 50 to strictly avoid "Transaction too big" metadata/size errors.
+            // Save chunks to Firestore sequentially to absolutely avoid any Batch/Transaction size limits
             const datasetColl = collection(db, 'apps', '2h_hub_v1', 'projects', projectId, 'datasets');
-            const BATCH_SIZE = 50;
             
-            for (let i = 0; i < data.chunks.length; i += BATCH_SIZE) {
-                const batch = writeBatch(db);
-                const chunkSlice = data.chunks.slice(i, i + BATCH_SIZE);
-                
-                for (const chunk of chunkSlice) {
-                    const newDoc = doc(datasetColl);
-                    batch.set(newDoc, {
-                        text: chunk.text,
-                        vector: chunk.vector,
-                        sourceName: file.name,
-                        timestamp: serverTimestamp()
-                    });
-                }
-                await batch.commit();
+            // We use limited concurrency (e.g., 5 at a time) to avoid freezing the browser but still be fast
+            const BATCH_LIMIT = 5;
+            for (let i = 0; i < data.chunks.length; i += BATCH_LIMIT) {
+                const chunkSlice = data.chunks.slice(i, i + BATCH_LIMIT);
+                await Promise.all(
+                    chunkSlice.map((chunk: any) => 
+                        addDoc(datasetColl, {
+                            text: chunk.text,
+                            vector: chunk.vector,
+                            sourceName: file.name,
+                            timestamp: serverTimestamp()
+                        })
+                    )
+                );
             }
 
             toast.success(`Successfully embedded ${data.chunks.length} chunks!`, { id: loadToast });
