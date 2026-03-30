@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { PDFParse } from 'pdf-parse';
+import pdfParse from 'pdf-parse/lib/pdf-parse.js';
 
 export const config = {
   api: {
@@ -25,9 +25,7 @@ export default async function handler(req, res) {
     // If a PDF is provided, extract its text
     if (base64Pdf) {
       const buffer = Buffer.from(base64Pdf, 'base64');
-      const parser = new PDFParse({ data: buffer });
-      const data = await parser.getText();
-      await parser.destroy();
+      const data = await pdfParse(buffer);
       extractedText += '\n\n' + data.text;
     }
 
