@@ -37,7 +37,7 @@ export default async function handler(req, res) {
     if (!apiKey) return res.status(500).json({ error: 'Missing API Key' });
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'text-embedding-004' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-embedding-2-preview' });
 
     // Simple chunking (e.g., split by paragraphs or ~1000 characters)
     const rawChunks = extractedText.split(/\n\s*\n/);

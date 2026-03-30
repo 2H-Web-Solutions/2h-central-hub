@@ -333,7 +333,7 @@ export default async function handler(req, res) {
           if (datasets && datasets.length > 0) {
             try {
               // Get embedding for the query
-              const embeddingModel = genAI.getGenerativeModel({ model: 'text-embedding-004' });
+              const embeddingModel = genAI.getGenerativeModel({ model: 'gemini-embedding-2-preview' });
               const embedResult = await embeddingModel.embedContent(call.args.query);
               const queryVector = embedResult.embedding.values;
 
