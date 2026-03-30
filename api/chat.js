@@ -99,12 +99,38 @@ const tools = [
           },
           required: ["filePath"]
         }
+      },
+      {
+        name: "search_project_datasets",
+        description: "Searches through the user-uploaded datasets (like PDF manuals, architectural docs, API specs) for the given query. Use this tool if the standard context does not contain the answer. This semantic search retrieves the most relevant paragraphs.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            query: {
+              type: "STRING",
+              description: "The search query to match against the datasets."
+            }
+          },
+          required: ["query"]
+        }
       }
     ]
   }
 ];
 
 // --- HELPER FUNCTIONS ---
+const cosineSimilarity = (vecA, vecB) => {
+  let dotProduct = 0.0;
+  let normA = 0.0;
+  let normB = 0.0;
+  for (let i = 0; i < vecA.length; i++) {
+    dotProduct += vecA[i] * vecB[i];
+    normA += vecA[i] * vecA[i];
+    normB += vecB[i] * vecB[i];
+  }
+  if (normA === 0 || normB === 0) return 0;
+  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+};
 const fetchGithubFile = async (repoUrl, filePath) => {
   try {
     if (!repoUrl) return "Error: No repository URL provided.";
@@ -155,7 +181,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') { return res.status(405).json({ error: 'Method not allowed' }); }
 
   try {
-    const { message, context, history, agentMode, aiModel, repoUrl, language, images } = req.body;
+    const { message, context, history, agentMode, aiModel, repoUrl, language, images, datasets } = req.body;
     const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
     if (!apiKey) return res.status(500).json({ error: 'Missing API Key' });
 
@@ -298,6 +324,43 @@ export default async function handler(req, res) {
             functionResponse: {
               name: 'read_github_file',
               response: { content: fileContent }
+            }
+          };
+        } else if (call.name === 'search_project_datasets') {
+          console.log(`[Tool] Searching datasets for query: ${call.args.query}`);
+          let searchResult = "No datasets available to search.";
+
+          if (datasets && datasets.length > 0) {
+            try {
+              // Get embedding for the query
+              const embeddingModel = genAI.getGenerativeModel({ model: 'text-embedding-004' });
+              const embedResult = await embeddingModel.embedContent(call.args.query);
+              const queryVector = embedResult.embedding.values;
+
+              // Compute similarities
+              const scoredDatasets = datasets.map(d => ({
+                text: d.text,
+                score: cosineSimilarity(queryVector, d.vector)
+              }));
+
+              // Sort descending
+              scoredDatasets.sort((a, b) => b.score - a.score);
+
+              // Take top 5
+              const topMatches = scoredDatasets.slice(0, 5).map(m => `[Relevance Score: ${m.score.toFixed(3)}]\n${m.text}`);
+              searchResult = `Found the following relevant excerpts from uploaded datasets:\n\n${topMatches.join('\n\n---NEXT EXCERPT---\n\n')}`;
+            } catch (err) {
+              console.error("Vector search failed:", err);
+              searchResult = `Search failed due to an error: ${err.message}`;
+            }
+          }
+
+          toolCallLogs.push(`Searched datasets for "${call.args.query}". Matches found: ${datasets && datasets.length > 0 ? 'Yes' : 'No'}`);
+          
+          return {
+            functionResponse: {
+              name: 'search_project_datasets',
+              response: { content: searchResult }
             }
           };
         } else {

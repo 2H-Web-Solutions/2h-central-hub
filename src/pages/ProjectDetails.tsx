@@ -5,10 +5,17 @@ import { db } from '../lib/firebase';
 import DashboardShell from '../components/DashboardShell';
 import SidebarNav from '../components/SidebarNav';
 import Button from '../components/Button';
-import { Github, Globe, ExternalLink, MessageSquare, Trash2, Lock, Copy, Paperclip, X, Archive, Map, Hammer, Bug, BookOpen, Edit2, Plus, PenSquare, Key, Check, Sparkles, Code2 } from 'lucide-react';
+import { Github, Globe, ExternalLink, MessageSquare, Trash2, Lock, Copy, Paperclip, X, Archive, Map, Hammer, Bug, BookOpen, Edit2, Plus, PenSquare, Key, Check, Sparkles, Code2, UploadCloud, FileText } from 'lucide-react';
 import RepoExplorer from '../components/glassbox/RepoExplorer';
 import ReactMarkdown from 'react-markdown';
 import toast from 'react-hot-toast';
+
+interface DatasetChunk {
+    id?: string;
+    text: string;
+    vector: number[];
+    timestamp?: any;
+}
 
 interface Project {
     id: string;
@@ -120,13 +127,17 @@ export default function ProjectDetails() {
     const [memory, setMemory] = useState('');
 
     // Knowledge Base Tabs
-    const [knowledgeTab, setKnowledgeTab] = useState<'timeline' | 'editor'>('timeline');
+    const [knowledgeTab, setKnowledgeTab] = useState<'timeline' | 'editor' | 'datasets'>('timeline');
     const [parsedLogs, setParsedLogs] = useState<parsedLog[]>([]);
 
     // Note State
     const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
     const [noteTitle, setNoteTitle] = useState('');
     const [noteContent, setNoteContent] = useState('');
+
+    // Dataset Upload States
+    const [datasets, setDatasets] = useState<DatasetChunk[]>([]);
+    const [isUploadingDataset, setIsUploadingDataset] = useState(false);
 
 
     // Firebase Config Form States
@@ -248,6 +259,20 @@ export default function ProjectDetails() {
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatMessage));
             setMessages(msgs);
+        });
+        return () => unsubscribe();
+    }, [projectId]);
+
+    // Subscribe to Datasets
+    useEffect(() => {
+        if (!projectId) return;
+        const q = query(
+            collection(db, 'apps', '2h_hub_v1', 'projects', projectId, 'datasets'),
+            orderBy('timestamp', 'desc')
+        );
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const chunks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DatasetChunk));
+            setDatasets(chunks);
         });
         return () => unsubscribe();
     }, [projectId]);
@@ -428,6 +453,77 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
         setAttachments(prev => prev.filter((_, i) => i !== index));
     };
 
+    // --- HANDLERS FOR DATASET UPLOAD ---
+    const handleUploadDatasetFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0 || !projectId) return;
+        const file = e.target.files[0];
+        setIsUploadingDataset(true);
+        const loadToast = toast.loading(`Processing ${file.name}...`);
+
+        try {
+            let base64Pdf: string | undefined = undefined;
+            let text: string | undefined = undefined;
+
+            if (file.type === 'application/pdf') {
+                const b64 = await convertFileToBase64(file);
+                // Strip the data:application/pdf;base64, prefix
+                base64Pdf = b64.replace(/^data:application\/pdf;base64,/, '');
+            } else {
+                text = await file.text();
+            }
+
+            const response = await fetch('/api/embed', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text, base64Pdf }),
+            });
+
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.error || "Embed API failed");
+            }
+
+            const data = await response.json();
+
+            // Save chunks to Firestore
+            const batch = writeBatch(db);
+            const datasetColl = collection(db, 'apps', '2h_hub_v1', 'projects', projectId, 'datasets');
+            
+            for (const chunk of data.chunks) {
+                const newDoc = doc(datasetColl);
+                batch.set(newDoc, {
+                    text: chunk.text,
+                    vector: chunk.vector,
+                    sourceName: file.name,
+                    timestamp: serverTimestamp()
+                });
+            }
+
+            await batch.commit();
+
+            toast.success(`Successfully embedded ${data.chunks.length} chunks!`, { id: loadToast });
+        } catch (error: any) {
+            console.error("Dataset upload error:", error);
+            toast.error(error.message || "Failed to upload dataset", { id: loadToast });
+        } finally {
+            setIsUploadingDataset(false);
+            if (e.target) e.target.value = ''; // Reset file input
+        }
+    };
+
+    const handleDeleteDatasetChunk = async (chunkId: string) => {
+        if (!projectId) return;
+        if (!window.confirm("Delete this chunk from the AI knowledge base?")) return;
+        try {
+            await deleteDoc(doc(db, 'apps', '2h_hub_v1', 'projects', projectId, 'datasets', chunkId));
+            toast.success("Dataset chunk removed");
+        } catch (e) {
+            console.error(e);
+            toast.error("Failed to remove chunk");
+        }
+    };
+
+
     // --- SEND LOGIC ---
 
     const handleSendMessage = async (e?: React.FormEvent) => {
@@ -480,6 +576,8 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                     aiModel: project?.aiModel || 'gemini-3.1-pro-preview',
                     history: messages.map(m => ({ role: m.role, content: m.content })),
                     repoUrl: githubUrl || null,
+                    // Pass Datasets for RAG
+                    datasets: datasets.map(d => ({ text: d.text, vector: d.vector })),
                     // NOTE: Real multimodal support would require sending the Base64 in a specific format to the API. 
                     // For now, we assume text-based context or that the API ignores images if not supported.
                     // If you want actual Vision capabilities, you'd insert the image data here.
@@ -848,6 +946,15 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                             >
                                 <Edit2 size={16} /> Raw Editor
                             </button>
+                            <button
+                                onClick={() => setKnowledgeTab('datasets')}
+                                className={`pb-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${knowledgeTab === 'datasets'
+                                    ? 'border-brand-lime text-brand-black'
+                                    : 'border-transparent text-gray-400 hover:text-gray-600'
+                                    }`}
+                            >
+                                <FileText size={16} /> Datasets (PDF/Txt)
+                            </button>
                         </div>
 
                         {/* Content Area */}
@@ -985,6 +1092,53 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                                     onChange={(e) => setMemory(e.target.value)}
                                     onBlur={() => handleUpdateField('memory', memory)}
                                 ></textarea>
+                            </div>
+                        )}
+
+                        {/* 3. Datasets View */}
+                        {knowledgeTab === 'datasets' && (
+                            <div className="flex-1 flex flex-col p-4 relative overflow-hidden">
+                                <div className="mb-4">
+                                    <p className="text-xs text-gray-500 mb-3">Upload reference material like PDFs or raw text files. The AI will search through it only when you ask related questions.</p>
+                                    <div className="flex items-center gap-3">
+                                        <label className={`flex-1 flex justify-center items-center gap-2 border-2 border-dashed border-gray-200 rounded-xl p-4 cursor-pointer hover:border-brand-lime transition-colors ${isUploadingDataset ? 'opacity-50 pointer-events-none' : ''}`}>
+                                            <input type="file" className="hidden" accept=".pdf,.txt,.md,.csv,.json" onChange={handleUploadDatasetFile} />
+                                            <UploadCloud size={20} className="text-gray-400" />
+                                            <span className="text-sm font-medium text-gray-600">
+                                                {isUploadingDataset ? 'Processing Vectors...' : 'Upload PDF / Text Document'}
+                                            </span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div className="flex-1 overflow-y-auto pr-2 space-y-3">
+                                    {datasets.length === 0 ? (
+                                        <div className="text-center py-10 text-gray-400 text-sm italic">
+                                            No datasets uploaded. Upload a PDF or Text file.
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 gap-3">
+                                            {datasets.map((chunk, idx) => (
+                                                <div key={chunk.id || idx} className="bg-gray-50 border border-gray-100 rounded-lg p-3 relative group">
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <span className="text-[10px] font-bold text-brand-lime uppercase tracking-wider bg-brand-black px-2 py-0.5 rounded">
+                                                            Chunk {(chunk as any).sourceName ? `- ${(chunk as any).sourceName}` : idx + 1}
+                                                        </span>
+                                                        <button 
+                                                            onClick={() => handleDeleteDatasetChunk(chunk.id!)}
+                                                            className="text-gray-300 hover:text-red-500 transition-colors p-1 bg-white rounded shadow-sm opacity-0 group-hover:opacity-100"
+                                                        >
+                                                            <Trash2 size={12} />
+                                                        </button>
+                                                    </div>
+                                                    <p className="text-xs text-gray-600 line-clamp-3 leading-relaxed">
+                                                        {chunk.text}
+                                                    </p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>
