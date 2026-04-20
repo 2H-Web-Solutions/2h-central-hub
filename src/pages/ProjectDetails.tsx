@@ -703,11 +703,17 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
         try {
             const chatColl = collection(db, 'apps', '2h_hub_v1', 'projects', projectId, 'chat');
             const snapshot = await getDocs(chatColl);
-            const batch = writeBatch(db);
-            snapshot.docs.forEach((doc) => {
-                batch.delete(doc.ref);
-            });
-            await batch.commit();
+            
+            // Delete documents in chunks of 450 to respect Firestore batch limits
+            const docs = snapshot.docs;
+            for (let i = 0; i < docs.length; i += 450) {
+                const batch = writeBatch(db);
+                docs.slice(i, i + 450).forEach((docSnap) => {
+                    batch.delete(docSnap.ref);
+                });
+                await batch.commit();
+            }
+            
             toast.success("Chat wiped clean.");
         } catch (error) {
             console.error("Error clearing chat:", error);
