@@ -701,17 +701,18 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
         if (!skipConfirm && !window.confirm("Are you sure you want to WIPE the chat history? This cannot be undone.")) return;
 
         try {
-            const chatColl = collection(db, 'apps', '2h_hub_v1', 'projects', projectId, 'chat');
-            const snapshot = await getDocs(chatColl);
+            if (messages.length === 0) return;
+
+            // Wir nutzen die bereits im State geladenen 'messages', um fehlerhafte getDocs() (Permission Issues) zu vermeiden.
+            // Die Löschung erfolgt über einzelne deleteDocs in 50er-Schritten (Promise.all) anstatt über ein writeBatch, 
+            // da writeBatch oft zusätzliche Array-Regeln in den Security Rules triggern kann.
             
-            // Delete documents in chunks of 450 to respect Firestore batch limits
-            const docs = snapshot.docs;
-            for (let i = 0; i < docs.length; i += 450) {
-                const batch = writeBatch(db);
-                docs.slice(i, i + 450).forEach((docSnap) => {
-                    batch.delete(docSnap.ref);
-                });
-                await batch.commit();
+            for (let i = 0; i < messages.length; i += 50) {
+                const chunk = messages.slice(i, i + 50);
+                await Promise.all(chunk.map(msg => {
+                    const docRef = doc(db, 'apps', '2h_hub_v1', 'projects', projectId, 'chat', msg.id);
+                    return deleteDoc(docRef);
+                }));
             }
             
             toast.success("Chat wiped clean.");
