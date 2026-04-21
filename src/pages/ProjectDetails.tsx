@@ -595,11 +595,11 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                 throw new Error("API not available (Localhost? Deploy to Vercel to test AI).");
             }
 
-            if (!response.ok) {
-                throw new Error("API Request failed");
-            }
-
             const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || "API Request failed");
+            }
 
             if (data.reply) {
                 // 3. Write AI Response to Firestore

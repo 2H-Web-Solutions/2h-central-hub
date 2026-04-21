@@ -243,10 +243,6 @@ export default async function handler(req, res) {
       selectedModel = 'gemini-3.1-pro-preview';
     }
 
-    // Auto-map to customtools variant for agent-based execution
-    if (selectedModel === 'gemini-3.1-pro-preview') {
-      selectedModel = 'gemini-3.1-pro-preview-customtools';
-    }
 
     const model = genAI.getGenerativeModel({
       model: selectedModel,
