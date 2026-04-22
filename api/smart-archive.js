@@ -19,7 +19,7 @@ export default async function handler(req, res) {
 
         // 2. Initialize Gemini (Gemini 3.1 Flash-Lite for speed)
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite-preview' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
         // 3. Construct the Archiver Prompt
         const prompt = `

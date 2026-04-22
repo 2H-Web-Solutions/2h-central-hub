@@ -60,7 +60,8 @@ export const geminiService = {
      */
     async generateContent(prompt: string, modelName: string = DEFAULT_MODEL): Promise<string> {
         try {
-            const model = genAI.getGenerativeModel({ model: modelName });
+            const actualModel = modelName.includes('3.1-pro') ? 'gemini-1.5-pro' : 'gemini-1.5-flash';
+            const model = genAI.getGenerativeModel({ model: actualModel });
             const result = await model.generateContent(prompt);
             const response = await result.response;
             return response.text();
@@ -82,9 +83,10 @@ export async function analyzeBrand(
     modelName: string = DEFAULT_MODEL
 ) {
     const globalKnowledge = await getGlobalKnowledge('Persona');
+    const actualModel = modelName.includes('3.1-pro') ? 'gemini-1.5-pro' : 'gemini-1.5-flash';
 
     const model = genAI.getGenerativeModel({
-        model: modelName,
+        model: actualModel,
         systemInstruction: `
       ROLE: Senior Performance Marketing Strategic Advisor (2H Web Solutions).
       
@@ -126,9 +128,10 @@ export async function getChatResponse(
     modelName: string = DEFAULT_MODEL
 ) {
     const globalKnowledge = await getGlobalKnowledge();
+    const actualModel = modelName.includes('3.1-pro') ? 'gemini-1.5-pro' : 'gemini-1.5-flash';
 
     const model = genAI.getGenerativeModel({
-        model: modelName,
+        model: actualModel,
         systemInstruction: `
       ROLE: Proactive Senior Performance Marketer.
       
@@ -229,7 +232,8 @@ Antworte strikt als JSON mit folgenden Keys:
         const mimeType = mimeTypeMatch[1];
         const base64Data = base64DataUrl.replace(/^data:image\/\w+;base64,/, "");
 
-        const model = genAI.getGenerativeModel({ model: modelName });
+        const actualModel = modelName.includes('3.1-pro') ? 'gemini-1.5-pro' : 'gemini-1.5-flash';
+        const model = genAI.getGenerativeModel({ model: actualModel });
         const result = await model.generateContent([
             prompt,
             {
