@@ -11,7 +11,7 @@ if (!API_KEY) {
 const genAI = new GoogleGenerativeAI(API_KEY || "");
 
 // Default model if none specified
-const DEFAULT_MODEL = "gemini-3.1-flash-lite-preview";
+const DEFAULT_MODEL = "gemini-3.1-pro-preview";
 
 /**
  * FETCHES FILTERED KNOWLEDGE from Global Brain.
@@ -60,7 +60,7 @@ export const geminiService = {
      */
     async generateContent(prompt: string, modelName: string = DEFAULT_MODEL): Promise<string> {
         try {
-            const actualModel = modelName.includes('3.1-pro') ? 'gemini-1.5-pro' : 'gemini-1.5-flash';
+            const actualModel = 'gemini-3.1-pro-preview';
             const model = genAI.getGenerativeModel({ model: actualModel });
             const result = await model.generateContent(prompt);
             const response = await result.response;
@@ -83,7 +83,7 @@ export async function analyzeBrand(
     modelName: string = DEFAULT_MODEL
 ) {
     const globalKnowledge = await getGlobalKnowledge('Persona');
-    const actualModel = modelName.includes('3.1-pro') ? 'gemini-1.5-pro' : 'gemini-1.5-flash';
+    const actualModel = 'gemini-3.1-pro-preview';
 
     const model = genAI.getGenerativeModel({
         model: actualModel,
@@ -128,7 +128,7 @@ export async function getChatResponse(
     modelName: string = DEFAULT_MODEL
 ) {
     const globalKnowledge = await getGlobalKnowledge();
-    const actualModel = modelName.includes('3.1-pro') ? 'gemini-1.5-pro' : 'gemini-1.5-flash';
+    const actualModel = 'gemini-3.1-pro-preview';
 
     const model = genAI.getGenerativeModel({
         model: actualModel,
@@ -232,7 +232,7 @@ Antworte strikt als JSON mit folgenden Keys:
         const mimeType = mimeTypeMatch[1];
         const base64Data = base64DataUrl.replace(/^data:image\/\w+;base64,/, "");
 
-        const actualModel = modelName.includes('3.1-pro') ? 'gemini-1.5-pro' : 'gemini-1.5-flash';
+        const actualModel = 'gemini-3.1-pro-preview';
         const model = genAI.getGenerativeModel({ model: actualModel });
         const result = await model.generateContent([
             prompt,

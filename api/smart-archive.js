@@ -17,9 +17,9 @@ export default async function handler(req, res) {
 
         if (!apiKey) return res.status(500).json({ error: 'Missing API Key' });
 
-        // 2. Initialize Gemini (Gemini 3.1 Flash-Lite for speed)
+        // 2. Initialize Gemini
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-3.1-pro-preview' });
 
         // 3. Construct the Archiver Prompt
         const prompt = `

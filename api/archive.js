@@ -15,8 +15,8 @@ export default async function handler(req, res) {
         if (!apiKey) return res.status(500).json({ error: 'Missing API Key' });
 
         const genAI = new GoogleGenerativeAI(apiKey);
-        // Use Flash for speed
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        // Always use gemini-3.1-pro-preview
+        const model = genAI.getGenerativeModel({ model: 'gemini-3.1-pro-preview' });
 
         const prompt = `
         ROLE: Technical Logbook Writer.
