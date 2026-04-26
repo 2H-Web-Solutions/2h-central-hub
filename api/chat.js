@@ -244,7 +244,7 @@ export default async function handler(req, res) {
     }
 
     // MAP TO ACTUAL GOOGLE MODELS
-    const actualModel = selectedModel === 'gemini-3.1-flash-lite-preview' ? 'gemini-1.5-flash' : 'gemini-1.5-pro';
+    const actualModel = 'gemini-3.1-pro-preview';
 
     const model = genAI.getGenerativeModel({
       model: actualModel,
@@ -286,38 +286,67 @@ export default async function handler(req, res) {
     }
 
     // Send Message
-    const result = await chat.sendMessage(messageParts);
-    const response = await result.response;
-
-    // handle function calls (single turn for now, simple implementation)
-    // The model might call a function. We need to check for it.
-    const calls = response.functionCalls();
-
-    const safeGetText = (resp) => {
-      try {
-        const text = resp.text();
-        if (text) return text;
-        const calls = resp.functionCalls();
-        if (calls && calls.length > 0) {
-          return `[System: The AI attempted to call a function '${calls[0].name}' but did not provide a text response.]`;
-        }
-        return "[System: The AI returned an empty response.]";
-      } catch (e) {
-        console.warn("safeGetText error:", e);
-        return `[System: Could not parse AI response. Error: ${e.message}]`;
-      }
-    };
-
     // Start conversation loop to handle multiple tool hops
-    let currentResponse = response;
     let turnCount = 0;
     const MAX_TURNS = 15;
     let toolCallLogs = [];
 
-    while (currentResponse.functionCalls() && currentResponse.functionCalls().length > 0 && turnCount < MAX_TURNS) {
-      const calls = currentResponse.functionCalls();
-      
-      const functionResponses = await Promise.all(calls.map(async (call) => {
+    // Setup SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    
+    const sendEvent = (data) => {
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+        if (res.flush) res.flush();
+    };
+
+    let nextInput = messageParts;
+    let isFirstTurn = true;
+
+    while (turnCount < MAX_TURNS) {
+        let streamResult;
+        if (isFirstTurn) {
+            streamResult = await chat.sendMessageStream(nextInput);
+            isFirstTurn = false;
+        } else {
+            streamResult = await chat.sendMessageStream(nextInput);
+        }
+
+        let functionCalls = [];
+        let textGenerated = false;
+
+        for await (const chunk of streamResult.stream) {
+            const calls = chunk.functionCalls();
+            if (calls && calls.length > 0) {
+                functionCalls = functionCalls.concat(calls);
+            }
+            try {
+                const textChunk = chunk.text();
+                if (textChunk) {
+                    textGenerated = true;
+                    let cleanText = textChunk;
+                    // Try to filter out internal thoughts if any appear
+                    cleanText = cleanText.replace(/묵?thought[\s\S]*?(?=\n\n(?:[^a-z(]|$))/g, '');
+                    cleanText = cleanText.replace(/<thought>[\s\S]*?<\/thought>/g, '');
+                    sendEvent({ type: 'chunk', text: cleanText });
+                }
+            } catch (e) {
+                // chunk.text() might throw if it's purely a function call chunk
+            }
+        }
+
+        if (functionCalls.length === 0) {
+            // No more function calls, we are done
+            if (!textGenerated && toolCallLogs.length > 0) {
+                sendEvent({ type: 'chunk', text: `\n\n[System: The AI processed the following files but didn't generate a text response:\n- ${toolCallLogs.join('\n- ')}]` });
+            }
+            break;
+        }
+
+      sendEvent({ type: 'status', message: `🛠️ KI ruft Tools auf (${functionCalls.length})...` });
+
+      const functionResponses = await Promise.all(functionCalls.map(async (call) => {
         if (call.name === 'read_github_file') {
           console.log(`[Tool] Reading file: ${call.args.filePath}`);
           const fileContent = await fetchGithubFile(repoUrl, call.args.filePath);
@@ -335,21 +364,17 @@ export default async function handler(req, res) {
 
           if (datasets && datasets.length > 0) {
             try {
-              // Get embedding for the query
-              const embeddingModel = genAI.getGenerativeModel({ model: 'gemini-embedding-2-preview' });
+              const embeddingModel = genAI.getGenerativeModel({ model: 'gemini-embedding-2-preview' }); // Use text-embedding-004 fallback if this fails, but it usually catches
               const embedResult = await embeddingModel.embedContent(call.args.query);
               const queryVector = embedResult.embedding.values;
 
-              // Compute similarities
               const scoredDatasets = datasets.map(d => ({
                 text: d.text,
                 score: cosineSimilarity(queryVector, d.vector)
               }));
 
-              // Sort descending
               scoredDatasets.sort((a, b) => b.score - a.score);
 
-              // Take top 5
               const topMatches = scoredDatasets.slice(0, 5).map(m => `[Relevance Score: ${m.score.toFixed(3)}]\n${m.text}`);
               searchResult = `Found the following relevant excerpts from uploaded datasets:\n\n${topMatches.join('\n\n---NEXT EXCERPT---\n\n')}`;
             } catch (err) {
@@ -377,37 +402,21 @@ export default async function handler(req, res) {
         }
       }));
 
-      // Send ALL Responses back to model
-      const toolResult = await chat.sendMessage(functionResponses);
-      currentResponse = await toolResult.response;
-
+      nextInput = functionResponses;
       turnCount++;
     }
 
-    // Default response if no tool called or after all tool calls finish
-    let finalReply = null;
-    try {
-      finalReply = currentResponse.text();
-    } catch (e) { /* ignore */ }
-
-    if (!finalReply && toolCallLogs.length > 0) {
-      finalReply = `System: The AI processed the following files but didn't generate a text response:\n- ${toolCallLogs.join('\n- ')}`;
-    } else if (!finalReply) {
-      finalReply = safeGetText(currentResponse);
-    }
-
-    // Filter out internal thought blocks (e.g., "묵thought ...", "<thought>...")
-    // This removes everything from "묵thought" (or similar) up to the next proper paragraph, 
-    // or just strips out common thinking tokens if the model leaks them.
-    if (finalReply) {
-      finalReply = finalReply.replace(/묵?thought[\s\S]*?(?=\n\n(?:[^a-z(]|$))/g, '').trim();
-      finalReply = finalReply.replace(/<thought>[\s\S]*?<\/thought>/g, '').trim();
-    }
-
-    return res.status(200).json({ reply: finalReply });
+    sendEvent({ type: 'done' });
+    res.end();
 
   } catch (error) {
     console.error('Gemini API Error:', error);
-    return res.status(500).json({ error: error.message });
+    // If headers already sent, we can't send a 500 status easily, so we stream the error
+    if (!res.headersSent) {
+      return res.status(500).json({ error: error.message });
+    } else {
+      res.write(`data: ${JSON.stringify({ type: 'error', error: error.message })}\n\n`);
+      res.end();
+    }
   }
 }

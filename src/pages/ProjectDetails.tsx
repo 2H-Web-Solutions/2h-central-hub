@@ -152,6 +152,8 @@ export default function ProjectDetails() {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [chatInput, setChatInput] = useState('');
     const [isThinking, setIsThinking] = useState(false);
+    const [streamedMessage, setStreamedMessage] = useState('');
+    const [streamedStatus, setStreamedStatus] = useState('');
     const [agentMode, setAgentMode] = useState<'STARTER' | 'BUILDER' | 'SOLVER'>('BUILDER');
     const [language, setLanguage] = useState<'de' | 'en'>('de');
     const [attachments, setAttachments] = useState<string[]>([]);
@@ -576,7 +578,7 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                     context: combinedContext,
                     agent: agentMode === 'STARTER' ? 'Architect' : agentMode === 'BUILDER' ? 'Builder' : 'Fixer',
                     agentMode: agentMode,
-                    aiModel: project?.aiModel || 'gemini-1.5-pro',
+                    aiModel: project?.aiModel || 'gemini-3.1-pro-preview',
                     history: messages.map(m => ({ role: m.role, content: m.content })),
                     repoUrl: githubUrl || null,
                     // Pass Datasets for RAG
@@ -589,29 +591,59 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                 })
             });
 
-            // Check if response is JSON
+            // Check if response is JSON (usually an error)
             const contentType = response.headers.get("content-type");
-            if (!contentType || !contentType.includes("application/json")) {
-                throw new Error("API not available (Localhost? Deploy to Vercel to test AI).");
-            }
-
-            const data = await response.json();
-
-            if (!response.ok) {
+            if (contentType && contentType.includes("application/json")) {
+                const data = await response.json();
                 throw new Error(data.error || "API Request failed");
             }
 
-            if (data.reply) {
-                // 3. Write AI Response to Firestore
+            if (!response.body) throw new Error("No response body");
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let aiResponse = '';
+            
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                const chunkStr = decoder.decode(value, { stream: true });
+                const lines = chunkStr.split('\n');
+                
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.substring(6));
+                            if (data.type === 'status') {
+                                setStreamedStatus(data.message);
+                            } else if (data.type === 'chunk') {
+                                aiResponse += data.text;
+                                setStreamedMessage(aiResponse);
+                                setStreamedStatus(''); // Clear status when text starts
+                            } else if (data.type === 'error') {
+                                toast.error("KI Fehler: " + data.error);
+                            }
+                        } catch (e) {
+                            console.warn("Parse error for chunk:", line, e);
+                        }
+                    }
+                }
+            }
+
+            if (aiResponse) {
+                // 3. Write final AI Response to Firestore
                 await addDoc(collection(db, 'apps', '2h_hub_v1', 'projects', projectId, 'chat'), {
                     role: 'ai',
-                    content: data.reply,
+                    content: aiResponse,
                     timestamp: serverTimestamp()
                 });
             } else {
-                console.error("No reply from API");
-                toast.error("AI failed to respond");
+                toast.error("AI returned empty response");
             }
+            
+            setStreamedMessage('');
+            setStreamedStatus('');
 
         } catch (error: any) {
             console.error("Chat Error:", error);
@@ -1340,10 +1372,49 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                                             )}
                                         </div>
                                     ))}
-                                    {isThinking && (
+                                    {isThinking && !streamedMessage && !streamedStatus && (
                                         <div className="flex justify-start animate-pulse">
                                             <div className="bg-gray-100 px-5 py-3 rounded-2xl rounded-tl-none text-sm text-gray-500 italic">
                                                 Thinking...
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {streamedStatus && (
+                                        <div className="flex justify-start">
+                                            <div className="bg-gray-100 px-4 py-2 rounded-2xl rounded-tl-none text-xs font-mono text-brand-lime bg-brand-black flex items-center gap-2">
+                                                <div className="w-2 h-2 bg-brand-lime rounded-full animate-pulse" />
+                                                {streamedStatus}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {streamedMessage && (
+                                        <div className="flex justify-start items-start gap-2">
+                                            <div className="max-w-[80%] px-5 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap bg-gray-100 text-gray-800 rounded-tl-none border-b-2 border-brand-lime">
+                                                <ReactMarkdown
+                                                    components={{
+                                                        code(props) {
+                                                            const { children, className, node, ...rest } = props;
+                                                            const match = /language-(\w+)/.exec(className || '');
+                                                            return match ? (
+                                                                <CodeBlock language={match[1]}>{String(children).replace(/\n$/, '')}</CodeBlock>
+                                                            ) : (
+                                                                <code className="bg-black/5 px-1 py-0.5 rounded font-mono text-[0.9em] text-brand-black/80" {...rest}>
+                                                                    {children}
+                                                                </code>
+                                                            );
+                                                        },
+                                                        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                                                        ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
+                                                        ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
+                                                        li: ({ children }) => <li>{children}</li>,
+                                                        a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline hover:text-blue-800">{children}</a>
+                                                    }}
+                                                >
+                                                    {streamedMessage}
+                                                </ReactMarkdown>
+                                                <span className="inline-block w-2 h-4 bg-brand-black ml-1 animate-ping" />
                                             </div>
                                         </div>
                                     )}
