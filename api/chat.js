@@ -336,6 +336,10 @@ export default async function handler(req, res) {
             }
         }
 
+        // CRITICAL: Await the full response to ensure the SDK updates the internal chat.history 
+        // with the functionCall turn BEFORE we send the functionResponse turn.
+        await streamResult.response;
+
         if (functionCalls.length === 0) {
             // No more function calls, we are done
             if (!textGenerated && toolCallLogs.length > 0) {
