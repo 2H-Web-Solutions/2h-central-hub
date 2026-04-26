@@ -59,35 +59,45 @@ const CodeBlock = ({ language, children }: { language: string, children: string 
     const [isCopied, setIsCopied] = useState(false);
 
     const handleCopy = async () => {
-        // 1. Extract clean text
         const textToCopy = String(children).replace(/\n$/, '');
 
-        try {
-            // 2. Try Modern API
-            await navigator.clipboard.writeText(textToCopy);
-            setIsCopied(true);
-        } catch (err) {
-            console.warn('Clipboard API failed, trying fallback...', err);
-
-            // 3. Fallback: Old School "TextArea Hack" (Works everywhere)
+        // Helper to perform the fallback copy
+        const fallbackCopy = () => {
             try {
                 const textArea = document.createElement("textarea");
                 textArea.value = textToCopy;
-
-                // Ensure it's not visible but part of DOM
                 textArea.style.position = "fixed";
                 textArea.style.left = "-9999px";
                 document.body.appendChild(textArea);
-
                 textArea.select();
-                document.execCommand("copy");
+                const successful = document.execCommand("copy");
                 document.body.removeChild(textArea);
-
-                setIsCopied(true);
+                
+                if (successful) {
+                    setIsCopied(true);
+                } else {
+                    throw new Error("execCommand failed");
+                }
             } catch (fallbackErr) {
-                console.error('Copy failed completely:', fallbackErr);
+                console.error('Copy fallback failed:', fallbackErr);
                 alert("Copy failed. Please select text manually.");
             }
+        };
+
+        try {
+            // Check if we are in an iframe (often blocks clipboard)
+            const isIframe = window.self !== window.top;
+            
+            if (navigator.clipboard && window.isSecureContext && !isIframe) {
+                await navigator.clipboard.writeText(textToCopy);
+                setIsCopied(true);
+            } else {
+                // If in iframe or no clipboard API, go straight to fallback
+                fallbackCopy();
+            }
+        } catch (err) {
+            // If clipboard API fails (e.g. permission denied), try fallback
+            fallbackCopy();
         }
 
         setTimeout(() => setIsCopied(false), 2000);
@@ -379,11 +389,7 @@ VITE_FIREBASE_STORAGE_BUCKET=${storageBucket}
 VITE_FIREBASE_MESSAGING_SENDER_ID=${messagingSenderId}
 VITE_FIREBASE_APP_ID=${fbAppId}`;
 
-        try {
-            await navigator.clipboard.writeText(envContent);
-            toast.success("Copied .env block!");
-        } catch (err) {
-            console.warn('Clipboard API failed, trying fallback...', err);
+        const fallbackCopy = () => {
             try {
                 const textArea = document.createElement("textarea");
                 textArea.value = envContent;
@@ -391,13 +397,30 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                 textArea.style.left = "-9999px";
                 document.body.appendChild(textArea);
                 textArea.select();
-                document.execCommand("copy");
+                const successful = document.execCommand("copy");
                 document.body.removeChild(textArea);
-                toast.success("Copied .env block!");
+                if (successful) {
+                    toast.success("Copied .env block!");
+                } else {
+                    throw new Error("execCommand failed");
+                }
             } catch (fallbackErr) {
-                console.error('Copy failed completely:', fallbackErr);
+                console.error('Copy fallback failed:', fallbackErr);
                 toast.error("Copy failed. Please select text manually.");
             }
+        };
+
+        try {
+            const isIframe = window.self !== window.top;
+            
+            if (navigator.clipboard && window.isSecureContext && !isIframe) {
+                await navigator.clipboard.writeText(envContent);
+                toast.success("Copied .env block!");
+            } else {
+                fallbackCopy();
+            }
+        } catch (err) {
+            fallbackCopy();
         }
     };
 
