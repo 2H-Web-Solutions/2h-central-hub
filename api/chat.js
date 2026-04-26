@@ -288,7 +288,7 @@ export default async function handler(req, res) {
     // Send Message
     // Start conversation loop to handle multiple tool hops
     let turnCount = 0;
-    const MAX_TURNS = 15;
+    const MAX_TURNS = 7;
     let toolCallLogs = [];
 
     // Setup SSE headers

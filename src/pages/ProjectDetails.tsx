@@ -603,18 +603,23 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let aiResponse = '';
+            let buffer = '';
             
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
                 
-                const chunkStr = decoder.decode(value, { stream: true });
-                const lines = chunkStr.split('\n');
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                
+                // Keep the last partial line in the buffer
+                buffer = lines.pop() || '';
                 
                 for (const line of lines) {
-                    if (line.startsWith('data: ')) {
+                    const trimmedLine = line.trim();
+                    if (trimmedLine.startsWith('data: ')) {
                         try {
-                            const data = JSON.parse(line.substring(6));
+                            const data = JSON.parse(trimmedLine.substring(6));
                             if (data.type === 'status') {
                                 setStreamedStatus(data.message);
                             } else if (data.type === 'chunk') {
