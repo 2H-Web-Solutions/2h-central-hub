@@ -19,7 +19,7 @@ export default async function handler(req, res) {
 
         // 2. Initialize Gemini
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-3.1-pro-preview' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
 
         // 3. Construct the Archiver Prompt
         const prompt = `

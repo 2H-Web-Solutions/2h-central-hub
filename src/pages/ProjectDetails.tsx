@@ -576,7 +576,7 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                     context: combinedContext,
                     agent: agentMode === 'STARTER' ? 'Architect' : agentMode === 'BUILDER' ? 'Builder' : 'Fixer',
                     agentMode: agentMode,
-                    aiModel: project?.aiModel || 'gemini-3.1-pro-preview',
+                    aiModel: project?.aiModel || 'gemini-1.5-pro',
                     history: messages.map(m => ({ role: m.role, content: m.content })),
                     repoUrl: githubUrl || null,
                     // Pass Datasets for RAG

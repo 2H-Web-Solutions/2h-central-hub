@@ -244,7 +244,7 @@ export default async function handler(req, res) {
     }
 
     // MAP TO ACTUAL GOOGLE MODELS
-    const actualModel = 'gemini-3.1-pro-preview';
+    const actualModel = selectedModel === 'gemini-3.1-flash-lite-preview' ? 'gemini-1.5-flash' : 'gemini-1.5-pro';
 
     const model = genAI.getGenerativeModel({
       model: actualModel,
