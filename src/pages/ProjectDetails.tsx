@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, onSnapshot, updateDoc, collection, addDoc, serverTimestamp, query, orderBy, getDocs, writeBatch, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, updateDoc, collection, addDoc, serverTimestamp, query, orderBy, getDocs, writeBatch, deleteDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import DashboardShell from '../components/DashboardShell';
 import SidebarNav from '../components/SidebarNav';
@@ -236,6 +236,20 @@ export default function ProjectDetails() {
             setTimeout(() => setPromptCopied(false), 2000);
         });
     };
+
+    const handlePromptDownload = () => {
+        if (!generatedPrompt) return;
+        const blob = new Blob([generatedPrompt], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `antigravity_prompt_${project?.id || 'export'}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
 
     const [isDownloading, setIsDownloading] = useState(false);
 
@@ -1028,14 +1042,59 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                         </div>
 
                         <div className="space-y-4">
-                            {/* Prompt Rule Download */}
+                            {/* Prompt Rule Selection Dropdown */}
                             <div>
                                 <label className="block text-xs font-medium text-gray-500 mb-1">Antigravity Prompt</label>
+                                {selectedRuleId && rules.length > 0 && !rules.find(r => r.id === selectedRuleId) && (
+                                    <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
+                                        <AlertTriangle size={16} />
+                                        Linked Rule not found. Please select a new template.
+                                    </div>
+                                )}
+                                <select
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm font-medium focus:border-[#B7EF02] focus:ring-1 focus:ring-[#B7EF02] outline-none bg-gray-50"
+                                    value={selectedRuleId}
+                                    onChange={async (e) => {
+                                        const newPromptRuleId = e.target.value;
+                                        setSelectedRuleId(newPromptRuleId);
+                                        if (project?.id) {
+                                            try {
+                                                const correctProjectRef = doc(db, 'apps', '2h_hub_v1', 'projects', project.id);
+                                                await updateDoc(correctProjectRef, {
+                                                    promptRuleId: newPromptRuleId
+                                                });
+                                                toast.success("Prompt Template updated.");
+                                            } catch (err) {
+                                                console.error("Failed to update prompt rule id:", err);
+                                                toast.error("Failed to update Prompt Template.");
+                                            }
+                                        }
+                                    }}
+                                >
+                                    <option value="">-- Choose a template --</option>
+                                    {/* Sort rules so that rules matching the project type are at the top */}
+                                    {rules
+                                        .filter(rule => rule.category !== 'design')
+                                        .slice()
+                                        .sort((a, b) => {
+                                            const aMatches = a.category === project?.type || a.category === 'global';
+                                            const bMatches = b.category === project?.type || b.category === 'global';
+                                            if (aMatches && !bMatches) return -1;
+                                            if (!aMatches && bMatches) return 1;
+                                            return a.title.localeCompare(b.title);
+                                        })
+                                        .map(rule => (
+                                            <option key={rule.id} value={rule.id}>
+                                                {rule.title} ({rule.category})
+                                            </option>
+                                        ))
+                                    }
+                                </select>
                                 <button
                                     onClick={handleDownloadGlobalRule}
-                                    disabled={isDownloading || !project}
-                                    className={`w-full flex justify-center items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 text-xs font-bold rounded-lg transition-colors ${
-                                        (!project || isDownloading) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-200 hover:text-gray-900'
+                                    disabled={isDownloading || !project || !selectedRuleId}
+                                    className={`mt-2 w-full flex justify-center items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 text-xs font-bold rounded-lg transition-colors ${
+                                        (!project || !selectedRuleId || isDownloading) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-200 hover:text-gray-900'
                                     }`}
                                 >
                                     {isDownloading ? (
@@ -1052,13 +1111,42 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                                 </button>
                             </div>
 
-                            {/* Design Selection Download */}
+                            {/* Design Selection Dropdown */}
                             <div>
                                 <label className="block text-xs font-medium text-gray-500 mb-1">Design System</label>
+                                <select
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm font-medium focus:border-[#B7EF02] focus:ring-1 focus:ring-[#B7EF02] outline-none bg-gray-50"
+                                    value={project?.designRuleId || ''}
+                                    onChange={async (e) => {
+                                        const newDesignRuleId = e.target.value;
+                                        if (project?.id) {
+                                            try {
+                                                const correctProjectRef = doc(db, 'apps', '2h_hub_v1', 'projects', project.id);
+                                                await updateDoc(correctProjectRef, {
+                                                    designRuleId: newDesignRuleId
+                                                });
+                                                toast.success("Design System updated.");
+                                            } catch (err) {
+                                                console.error("Failed to update design rule id:", err);
+                                                toast.error("Failed to update Design System.");
+                                            }
+                                        }
+                                    }}
+                                >
+                                    <option value="">-- Choose a Design System --</option>
+                                    {designSystems
+                                        .sort((a, b) => a.title.localeCompare(b.title))
+                                        .map(ds => (
+                                            <option key={ds.id} value={ds.id}>
+                                                {ds.title}
+                                            </option>
+                                        ))
+                                    }
+                                </select>
                                 <button
                                     onClick={handleDownloadDesignRule}
                                     disabled={isDownloadingDesign || !project || !project.designRuleId}
-                                    className={`w-full flex justify-center items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 text-xs font-bold rounded-lg transition-colors ${
+                                    className={`mt-2 w-full flex justify-center items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 text-xs font-bold rounded-lg transition-colors ${
                                         (!project || !project.designRuleId || isDownloadingDesign) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-200 hover:text-gray-900'
                                     }`}
                                 >
