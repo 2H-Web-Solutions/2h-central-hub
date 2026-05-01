@@ -1,12 +1,16 @@
 import { useState, useEffect } from 'react';
-import { collection, setDoc, deleteDoc, updateDoc, doc, addDoc, onSnapshot, serverTimestamp, query, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, setDoc, deleteDoc, updateDoc, doc, addDoc, onSnapshot, serverTimestamp, query, orderBy, Timestamp, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import Button from '../components/Button';
 import DashboardShell from '../components/DashboardShell';
 import SidebarNav from '../components/SidebarNav';
 import SecureDeleteModal from '../components/SecureDeleteModal';
-import { Trash2, Folder, AppWindow, ChevronRight, Home, Layout, FolderInput, Pencil, X } from 'lucide-react';
+import { Trash2, Folder, AppWindow, ChevronRight, Home, Layout, FolderInput, Pencil, X, Download, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { rulesService, Rule } from '../services/rulesService';
+import { designSystemService, DesignSystem } from '../services/designSystemService';
+import { parseRuleTemplate } from '../utils/ruleParser';
+import toast from 'react-hot-toast';
 
 interface Project {
     id: string;
@@ -27,6 +31,8 @@ interface Project {
         messagingSenderId?: string;
         appId?: string;
     };
+    promptRuleId?: string;
+    designRuleId?: string;
 }
 
 interface Client {
@@ -37,6 +43,7 @@ interface Client {
     surfaceColor?: string;
     fontHeading?: string;
     fontBody?: string;
+    defaultDesignId?: string;
 }
 
 interface Folder {
@@ -126,6 +133,8 @@ export default function Projects() {
     const [projects, setProjects] = useState<Project[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
     const [folders, setFolders] = useState<Folder[]>([]); // New State
+    const [rules, setRules] = useState<Rule[]>([]);
+    const [designSystems, setDesignSystems] = useState<DesignSystem[]>([]);
 
     const [loading, setLoading] = useState(true);
 
@@ -156,7 +165,14 @@ export default function Projects() {
     const [version, setVersion] = useState('v1');
     const [includeTasks, setIncludeTasks] = useState(true);
     const [aiModel, setAiModel] = useState('gemini-3.1-pro-preview'); // NEW: AI Model State
+    const [defaultRuleId, setDefaultRuleId] = useState('');
+    const [designRuleId, setDesignRuleId] = useState('');
     const [generatedPrompt, setGeneratedPrompt] = useState('');
+
+    // Success Modal State
+    const [successProject, setSuccessProject] = useState<Project | null>(null);
+    const [isDownloadingGlobalRule, setIsDownloadingGlobalRule] = useState(false);
+    const [isDownloadingDesign, setIsDownloadingDesign] = useState(false);
 
     // Firebase Config State
     const [firebaseConfig, setFirebaseConfig] = useState({
@@ -202,6 +218,34 @@ export default function Projects() {
         });
         return () => unsubscribe();
     }, []);
+
+    // Fetch Rules
+    useEffect(() => {
+        rulesService.getAllRules().then(setRules).catch(console.error);
+    }, []);
+
+    // Fetch Design Systems
+    useEffect(() => {
+        designSystemService.getAllDesignSystems().then(setDesignSystems).catch(console.error);
+    }, []);
+
+    // Auto-select global_app_rule if type is App
+    useEffect(() => {
+        if (appType === 'App' || appType === 'Custom App') {
+            setDefaultRuleId('global_app_rule');
+        } else {
+            setDefaultRuleId('');
+        }
+    }, [appType]);
+
+    // Auto-select Design System based on client
+    useEffect(() => {
+        if (selectedClient && selectedClient.defaultDesignId) {
+            setDesignRuleId(selectedClient.defaultDesignId);
+        } else {
+            setDesignRuleId('');
+        }
+    }, [selectedClient]);
 
 
     // Generate Prompt Effect
@@ -263,6 +307,8 @@ VITE_FIREBASE_APP_ID=${firebaseConfig.appId || 'Pending'}
         setVersion('v1');
         setIncludeTasks(true);
         setAiModel('gemini-3.1-pro-preview'); // RESET MODEL
+        setDefaultRuleId('');
+        setDesignRuleId('');
 
         setFirebaseConfig({
             apiKey: '',
@@ -287,7 +333,7 @@ VITE_FIREBASE_APP_ID=${firebaseConfig.appId || 'Pending'}
         const fullSystemContext = GLOBAL_RULES + (includeTasks ? "\n\n" + TASK_PROTOCOL : "") + "\n\n" + generatedPrompt;
 
         try {
-            await setDoc(doc(db, 'apps', '2h_hub_v1', 'projects', appId), {
+            const newProjectData = {
                 appId,
                 clientId: selectedClient.id,
                 clientName: selectedClient.companyName,
@@ -296,15 +342,87 @@ VITE_FIREBASE_APP_ID=${firebaseConfig.appId || 'Pending'}
                 name: appName || appType,
                 includeTasks: includeTasks,
                 aiModel: aiModel, // SAVED: AI Brain Engine
+                defaultRuleId: defaultRuleId,
+                designRuleId: designRuleId,
                 createdAt: serverTimestamp(),
                 memory: fullSystemContext,
                 firebaseConfig
-            });
+            };
+            
+            await setDoc(doc(db, 'apps', '2h_hub_v1', 'projects', appId), newProjectData);
+            
             setIsWizardOpen(false);
+            setSuccessProject({ id: appId, ...newProjectData } as Project);
             resetForm();
         } catch (error) {
             console.error("Error creating project: ", error);
             alert("Failed to create project");
+        }
+    };
+
+    // DOWNLOAD LOGIC
+    const handleDownloadGlobalRule = async () => {
+        if (!successProject || !successProject.defaultRuleId) return;
+        setIsDownloadingGlobalRule(true);
+        try {
+            const ruleDoc = await getDoc(doc(db, 'apps', '2h_web_solutions_central_hub_v1', 'rules', successProject.defaultRuleId));
+            if (ruleDoc.exists()) {
+                const rule = { id: ruleDoc.id, ...ruleDoc.data() } as Rule;
+                
+                // Wir nutzen den gleichen Parser wie im Projekt-Cockpit
+                const variables = {
+                    APP_ID: successProject.appId,
+                    CLIENT_NAME: successProject.clientName,
+                    APP_NAME: successProject.name,
+                    APP_TYPE: successProject.type
+                };
+
+                const parsedContent = parseRuleTemplate(rule.content, variables);
+
+                const blob = new Blob([parsedContent], { type: 'text/markdown' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${rule.id}.md`;
+                a.click();
+                window.URL.revokeObjectURL(url);
+                toast.success('Global Rule downloaded');
+            } else {
+                toast.error('Global Rule not found');
+            }
+        } catch (error) {
+            console.error("Error downloading rule:", error);
+            toast.error('Failed to download rule');
+        } finally {
+            setIsDownloadingGlobalRule(false);
+        }
+    };
+
+    const handleDownloadDesignRule = async () => {
+        if (!successProject || !successProject.designRuleId) return;
+        setIsDownloadingDesign(true);
+        try {
+            const designDoc = await getDoc(doc(db, 'apps', '2h_web_solutions_central_hub_v1', 'design_systems', successProject.designRuleId));
+            if (designDoc.exists()) {
+                const designContent = designDoc.data().content;
+                
+                // ACHTUNG: Kein Parsing mehr. Wir laden den puren Text inkl. YAML Frontmatter und Stitch Direktive!
+                const blob = new Blob([designContent], { type: 'text/markdown' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `design.md`; // Dateiname muss zwingend design.md sein
+                a.click();
+                window.URL.revokeObjectURL(url);
+                toast.success('Design System downloaded');
+            } else {
+                toast.error('Design System not found');
+            }
+        } catch (error) {
+            console.error("Error downloading design:", error);
+            toast.error('Failed to download design system');
+        } finally {
+            setIsDownloadingDesign(false);
         }
     };
 
@@ -465,10 +583,12 @@ VITE_FIREBASE_APP_ID=${firebaseConfig.appId || 'Pending'}
                                 <div
                                     key={client.id}
                                     onClick={() => { setViewClient(client); setCurrentView('client'); }}
-                                    className="bg-white border border-gray-100 rounded-xl p-6 shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col items-center justify-center gap-4 py-12"
+                                    className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all cursor-pointer group flex flex-col items-center justify-center gap-5 py-12"
                                 >
-                                    <Folder size={48} className="text-brand-lime group-hover:scale-110 transition-transform" />
-                                    <h3 className="text-lg font-serif font-bold text-brand-black">{client.companyName}</h3>
+                                    <div className="p-4 bg-[#F8F8F9] rounded-2xl group-hover:bg-[#B7EF02]/10 transition-colors">
+                                        <Folder size={48} className="text-brand-lime group-hover:scale-110 transition-transform" />
+                                    </div>
+                                    <h3 className="text-xl font-serif font-bold text-brand-black">{client.companyName}</h3>
                                 </div>
                             ))}
                         </div>
@@ -484,11 +604,13 @@ VITE_FIREBASE_APP_ID=${firebaseConfig.appId || 'Pending'}
                                         <div
                                             key={folder.id}
                                             onClick={() => setViewFolder(folder)}
-                                            className="bg-yellow-50/50 border border-yellow-100 hover:border-yellow-300 rounded-xl p-4 flex items-center justify-between group cursor-pointer transition-all"
+                                            className="bg-yellow-50/50 border border-yellow-100 hover:border-yellow-300 rounded-2xl p-4 flex items-center justify-between group cursor-pointer transition-all hover:shadow-sm"
                                         >
                                             <div className="flex items-center gap-3">
-                                                <Folder size={24} className="text-yellow-500 fill-yellow-500/20" />
-                                                <span className="font-medium text-gray-800">{folder.name}</span>
+                                                <div className="p-2 bg-yellow-100/50 rounded-lg">
+                                                    <Folder size={20} className="text-yellow-600 fill-yellow-500/20" />
+                                                </div>
+                                                <span className="font-medium text-gray-800 font-serif">{folder.name}</span>
                                             </div>
                                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <button
@@ -522,7 +644,7 @@ VITE_FIREBASE_APP_ID=${firebaseConfig.appId || 'Pending'}
                                         <div
                                             key={project.id}
                                             onClick={() => navigate(`/projects/${project.id}`)}
-                                            className="bg-white border border-gray-100 rounded-xl p-6 shadow-sm hover:shadow-md transition-all relative group cursor-pointer"
+                                            className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all relative group cursor-pointer"
                                         >
                                             <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
                                                 <button
@@ -541,13 +663,13 @@ VITE_FIREBASE_APP_ID=${firebaseConfig.appId || 'Pending'}
                                                 </button>
                                             </div>
 
-                                            <div className="flex items-start gap-4 mb-3">
-                                                <div className="p-3 bg-gray-50 rounded-lg text-brand-lime">
+                                            <div className="flex items-start gap-4 mb-4">
+                                                <div className="p-3 bg-[#F8F8F9] rounded-xl text-brand-lime group-hover:bg-[#B7EF02]/10 transition-colors">
                                                     <Layout size={24} />
                                                 </div>
                                                 <div>
                                                     <h3 className="text-lg font-serif font-bold text-brand-black leading-tight">{project.name || project.type}</h3>
-                                                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mt-1">{project.type}</p>
+                                                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mt-1.5">{project.type}</p>
                                                 </div>
                                             </div>
 
@@ -645,6 +767,28 @@ VITE_FIREBASE_APP_ID=${firebaseConfig.appId || 'Pending'}
                                             value={appName}
                                             onChange={(e) => setAppName(e.target.value)}
                                         />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-brand-text-muted mb-1">Base Template / Rule</label>
+                                        <select
+                                            className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none transition-all bg-gray-50 text-brand-black"
+                                            value={defaultRuleId}
+                                            onChange={(e) => setDefaultRuleId(e.target.value)}
+                                        >
+                                            <option value="">-- No Default Rule --</option>
+                                            {rules.map(r => <option key={r.id} value={r.id}>{r.title} ({r.category})</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-brand-text-muted mb-1">Design System</label>
+                                        <select
+                                            className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none transition-all bg-gray-50 text-brand-black"
+                                            value={designRuleId}
+                                            onChange={(e) => setDesignRuleId(e.target.value)}
+                                        >
+                                            <option value="">-- No Design System --</option>
+                                            {designSystems.map(ds => <option key={ds.id} value={ds.id}>{ds.title}</option>)}
+                                        </select>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
@@ -754,6 +898,70 @@ VITE_FIREBASE_APP_ID=${firebaseConfig.appId || 'Pending'}
                             </Button>
                             <Button type="button" variant="primary" onClick={handleCreateProject} className="flex-1" disabled={!selectedClient}>
                                 Initialize Project
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Success / Post-Creation Modal */}
+            {successProject && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl relative animate-in fade-in zoom-in duration-200">
+                        <button
+                            onClick={() => setSuccessProject(null)}
+                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                        
+                        <div className="text-center mb-6">
+                            <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <CheckCircle className="w-8 h-8" />
+                            </div>
+                            <h2 className="text-2xl font-bold text-gray-900 font-serif">Project Created!</h2>
+                            <p className="text-gray-500 mt-2">
+                                Your app <strong className="text-gray-900">{successProject.name}</strong> is ready. Download the required templates below to seed the codebase.
+                            </p>
+                        </div>
+
+                        <div className="space-y-3 mb-8">
+                            <button
+                                onClick={handleDownloadGlobalRule}
+                                disabled={isDownloadingGlobalRule || !successProject.defaultRuleId}
+                                className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg hover:border-brand-lime hover:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
+                            >
+                                <div className="flex flex-col items-start">
+                                    <span className="font-medium text-gray-900">1. Global Rule</span>
+                                    <span className="text-xs text-gray-500">Antigravity Context Prompt</span>
+                                </div>
+                                <Download className="w-5 h-5 text-gray-400 group-hover:text-brand-lime" />
+                            </button>
+
+                            <button
+                                onClick={handleDownloadDesignRule}
+                                disabled={isDownloadingDesign || !successProject.designRuleId}
+                                className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg hover:border-brand-lime hover:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
+                            >
+                                <div className="flex flex-col items-start">
+                                    <span className="font-medium text-gray-900">2. Design System</span>
+                                    <span className="text-xs text-gray-500">design.md</span>
+                                </div>
+                                <Download className="w-5 h-5 text-gray-400 group-hover:text-brand-lime" />
+                            </button>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <Button 
+                                type="button" 
+                                variant="primary" 
+                                className="w-full"
+                                onClick={() => {
+                                    navigate(`/projects/${successProject.id}`);
+                                    setSuccessProject(null);
+                                }}
+                            >
+                                Enter Project Cockpit
                             </Button>
                         </div>
                     </div>

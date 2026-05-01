@@ -5,10 +5,13 @@ import { db } from '../lib/firebase';
 import DashboardShell from '../components/DashboardShell';
 import SidebarNav from '../components/SidebarNav';
 import Button from '../components/Button';
-import { Github, Globe, ExternalLink, MessageSquare, Trash2, Lock, Copy, Paperclip, X, Archive, Map, Hammer, Bug, BookOpen, Edit2, Plus, PenSquare, Key, Check, Sparkles, Code2, UploadCloud, FileText } from 'lucide-react';
+import { Github, Globe, ExternalLink, MessageSquare, Trash2, Lock, Copy, Paperclip, X, Archive, Map, Hammer, Bug, BookOpen, Edit2, Plus, PenSquare, Key, Check, Sparkles, Code2, UploadCloud, FileText, AlertTriangle, Download, CheckCircle2, Palette } from 'lucide-react';
 import RepoExplorer from '../components/glassbox/RepoExplorer';
 import ReactMarkdown from 'react-markdown';
 import toast from 'react-hot-toast';
+import { rulesService, Rule } from '../services/rulesService';
+import { designSystemService, DesignSystem } from '../services/designSystemService';
+import { parseRuleTemplate } from '../utils/ruleParser';
 
 interface DatasetChunk {
     id?: string;
@@ -34,10 +37,22 @@ interface Project {
         messagingSenderId?: string;
         appId?: string;
     };
-    agentMode?: 'STARTER' | 'BUILDER' | 'SOLVER';
     name?: string;
     aiModel?: string;
     language?: 'en' | 'de';
+    promptRuleId?: string;
+    designRuleId?: string;
+    designConfig?: {
+        fontHeading?: string;
+        fontBody?: string;
+        borderRadius?: string;
+        primaryColor?: string;
+        secondaryColor?: string;
+        tertiaryColor?: string;
+        backgroundColor?: string;
+        surfaceColor?: string;
+        textColor?: string;
+    };
 }
 
 interface ChatMessage {
@@ -107,13 +122,16 @@ const CodeBlock = ({ language, children }: { language: string, children: string 
         <div className="rounded-md overflow-hidden my-3 border border-gray-200 bg-white shadow-sm">
             <div className="flex justify-between items-center bg-gray-50 px-3 py-1.5 border-b border-gray-100">
                 <span className="text-[10px] font-mono font-bold text-gray-500 uppercase tracking-wider">{language}</span>
-                <button
-                    onClick={handleCopy}
-                    className="flex items-center gap-1.5 text-[10px] uppercase font-bold text-gray-400 hover:text-brand-black transition-colors"
-                >
-                    {isCopied ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
-                    {isCopied ? 'Copied' : 'Copy'}
-                </button>
+                <div className="flex items-center gap-3">
+
+                    <button
+                        onClick={handleCopy}
+                        className="flex items-center gap-1.5 text-[10px] uppercase font-bold text-gray-400 hover:text-brand-black transition-colors"
+                    >
+                        {isCopied ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                        {isCopied ? 'Copied' : 'Copy'}
+                    </button>
+                </div>
             </div>
             <pre className="bg-gray-50/50 p-3 overflow-x-auto text-xs font-mono leading-relaxed text-gray-700">
                 <code className={`language-${language}`}>
@@ -145,6 +163,181 @@ export default function ProjectDetails() {
     const [noteTitle, setNoteTitle] = useState('');
     const [noteContent, setNoteContent] = useState('');
 
+    // Antigravity Prompt Generator State
+    const [rules, setRules] = useState<Rule[]>([]);
+    const [designSystems, setDesignSystems] = useState<DesignSystem[]>([]);
+    const [selectedRuleId, setSelectedRuleId] = useState<string>('');
+    const [missingOverrides, setMissingOverrides] = useState<Record<string, string>>({});
+    const [generatedPrompt, setGeneratedPrompt] = useState<string>('');
+    const [missingKeys, setMissingKeys] = useState<string[]>([]);
+    const [promptCopied, setPromptCopied] = useState(false);
+
+    // Fetch Project Rules and Design Systems
+    useEffect(() => {
+        const fetchRulesAndDesigns = async () => {
+            try {
+                const fetchedRules = await rulesService.getAllRules();
+                setRules(fetchedRules);
+                const fetchedDesigns = await designSystemService.getAllDesignSystems();
+                setDesignSystems(fetchedDesigns);
+            } catch (err) {
+                console.error("Failed to fetch rules or design systems", err);
+            }
+        };
+        fetchRulesAndDesigns();
+    }, []);
+
+    // Auto-select rule if project has a promptRuleId
+    useEffect(() => {
+        if (project?.promptRuleId && !selectedRuleId) {
+            setSelectedRuleId(project.promptRuleId);
+        }
+    }, [project?.promptRuleId, selectedRuleId]);
+
+    // Generate Prompt when selection or overrides change
+    useEffect(() => {
+        if (!selectedRuleId || !project) {
+            setGeneratedPrompt('');
+            setMissingKeys([]);
+            return;
+        }
+
+        const rule = rules.find(r => r.id === selectedRuleId);
+        if (!rule) return;
+
+        // Flatten project context
+        const projectData = {
+            ...project,
+            project_name: project.name || project.type,
+            project_type: project.type,
+            client_name: project.clientName,
+            github_url: project.githubUrl,
+            vercel_url: project.vercelUrl,
+            gemini_api_key: project.geminiApiKey,
+            // Include nested firebase config as flat keys
+            firebase_api_key: project.firebaseConfig?.apiKey,
+            firebase_project_id: project.firebaseConfig?.projectId,
+            firebase_auth_domain: project.firebaseConfig?.authDomain,
+            firebase_storage_bucket: project.firebaseConfig?.storageBucket,
+            firebase_messaging_sender_id: project.firebaseConfig?.messagingSenderId,
+            firebase_app_id: project.firebaseConfig?.appId,
+            memory: project.memory
+        };
+
+        const result = parseRuleTemplate(rule.content, projectData, missingOverrides);
+        setGeneratedPrompt(result.parsedTemplate);
+        setMissingKeys(result.missingKeys);
+    }, [selectedRuleId, project, rules, missingOverrides]);
+
+    const handlePromptCopy = () => {
+        navigator.clipboard.writeText(generatedPrompt).then(() => {
+            setPromptCopied(true);
+            toast.success("Prompt copied to clipboard!");
+            setTimeout(() => setPromptCopied(false), 2000);
+        });
+    };
+
+    const [isDownloading, setIsDownloading] = useState(false);
+
+    const handleDownloadGlobalRule = async () => {
+        if (!project) return;
+        setIsDownloading(true);
+
+        try {
+            const ruleDocRef = doc(db, 'apps', '2h_web_solutions_central_hub_v1', 'rules', 'global_app_rule');
+            const ruleSnap = await getDoc(ruleDocRef);
+
+            if (!ruleSnap.exists()) {
+                toast.error("Global Rule not found. Please create it in Settings -> Rules first.");
+                setIsDownloading(false);
+                return;
+            }
+
+            const ruleData = ruleSnap.data() as Rule;
+
+            // Flatten project context to pass to parser
+            const projectData = {
+                ...project,
+                project_name: project.name || project.type,
+                project_type: project.type,
+                client_name: project.clientName,
+                github_repo: project.githubUrl,
+                vercel_url: project.vercelUrl,
+                gemini_api_key: project.geminiApiKey,
+                firebase_api_key: project.firebaseConfig?.apiKey,
+                firebase_project_id: project.firebaseConfig?.projectId,
+                firebase_auth_domain: project.firebaseConfig?.authDomain,
+                firebase_storage_bucket: project.firebaseConfig?.storageBucket,
+                firebase_messaging_sender_id: project.firebaseConfig?.messagingSenderId,
+                firebase_app_id: project.firebaseConfig?.appId,
+                primary: project.primaryColor,
+                secondary: project.secondaryColor,
+                tertiary: project.tertiaryColor,
+                memory: project.memory
+            };
+
+            const result = parseRuleTemplate(ruleData.content, projectData, missingOverrides);
+            const parsedContent = result.parsedTemplate;
+
+            const blob = new Blob([parsedContent], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const projectName = project.name || project.type || 'project';
+            a.download = `antigravity_prompt_${projectName.replace(/\s+/g, '_').toLowerCase()}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            toast.success("Global Rule downloaded successfully!");
+
+        } catch (error) {
+            console.error("Error downloading global rule:", error);
+            toast.error("Failed to download Global Rule.");
+        } finally {
+            setIsDownloading(false);
+        }
+    };
+
+    const [isDownloadingDesign, setIsDownloadingDesign] = useState(false);
+
+    const handleDownloadDesignRule = async () => {
+        if (!project?.designRuleId) {
+            toast.error("Please select a Design System for this project first.");
+            return;
+        }
+
+        setIsDownloadingDesign(true);
+
+        try {
+            const ruleData = await designSystemService.getDesignSystem(project.designRuleId);
+
+            if (!ruleData) {
+                toast.error("Selected Design Rule not found. It might have been deleted.");
+                setIsDownloadingDesign(false);
+                return;
+            }
+            const blob = new Blob([ruleData.content], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `design.md`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            toast.success("design.md downloaded successfully!");
+
+        } catch (error) {
+            console.error("Error downloading design rule:", error);
+            toast.error("Failed to download design.md.");
+        } finally {
+            setIsDownloadingDesign(false);
+        }
+    };
+
     // Dataset Upload States
     const [datasets, setDatasets] = useState<DatasetChunk[]>([]);
     const [isUploadingDataset, setIsUploadingDataset] = useState(false);
@@ -164,7 +357,6 @@ export default function ProjectDetails() {
     const [isThinking, setIsThinking] = useState(false);
     const [streamedMessage, setStreamedMessage] = useState('');
     const [streamedStatus, setStreamedStatus] = useState('');
-    const [agentMode, setAgentMode] = useState<'STARTER' | 'BUILDER' | 'SOLVER'>('BUILDER');
     const [language, setLanguage] = useState<'de' | 'en'>('de');
     const [attachments, setAttachments] = useState<string[]>([]);
     const [viewMode, setViewMode] = useState<'chat' | 'code'>('chat');
@@ -197,10 +389,7 @@ export default function ProjectDetails() {
                     }
                 }
 
-                // Sync Agent Mode from Project (Persistence)
-                if (data.agentMode) {
-                    setAgentMode(data.agentMode as 'STARTER' | 'BUILDER' | 'SOLVER');
-                }
+
 
                 if (data.language) {
                     setLanguage(data.language as 'en' | 'de');
@@ -337,19 +526,6 @@ export default function ProjectDetails() {
         toast.success("Entry deleted");
     };
 
-
-    const handleModeChange = async (newMode: 'STARTER' | 'BUILDER' | 'SOLVER') => {
-        setAgentMode(newMode);
-        toast.success(`Switched to ${newMode === 'STARTER' ? 'Architect' : newMode === 'BUILDER' ? 'Builder' : 'Fixer'} Mode`);
-
-        if (!projectId) return;
-        try {
-            const docRef = doc(db, 'apps', '2h_hub_v1', 'projects', projectId);
-            await updateDoc(docRef, { agentMode: newMode });
-        } catch (error) {
-            console.error("Error updating agent mode:", error);
-        }
-    };
 
     const handleLanguageChange = async (newLang: 'de' | 'en') => {
         setLanguage(newLang);
@@ -599,8 +775,8 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                 body: JSON.stringify({
                     message: currentInput + (currentAttachments.length > 0 ? `\n[With ${currentAttachments.length} images]` : ''),
                     context: combinedContext,
-                    agent: agentMode === 'STARTER' ? 'Architect' : agentMode === 'BUILDER' ? 'Builder' : 'Fixer',
-                    agentMode: agentMode,
+                    agent: 'Builder',
+                    agentMode: 'BUILDER',
                     aiModel: project?.aiModel || 'gemini-3.1-pro-preview',
                     history: messages.map(m => ({ role: m.role, content: m.content })),
                     repoUrl: githubUrl || null,
@@ -828,8 +1004,10 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
             headerTitle="Project Cockpit"
             sidebarContent={<SidebarNav />}
             headerActions={
-                <div className="flex items-center gap-2 text-sm text-gray-500 font-mono bg-gray-100 px-3 py-1 rounded-full">
-                    {project?.appId}
+                <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 text-sm text-gray-500 font-mono bg-gray-100 px-3 py-1 rounded-full">
+                        {project?.appId}
+                    </div>
                 </div>
             }
         >
@@ -837,165 +1015,204 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                 {/* LEFT COLUMN: Project Context */}
                 <div className="w-1/3 flex flex-col gap-6 overflow-y-auto pr-2">
                     {/* Header Card */}
-                    <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-                        <h1 className="text-3xl font-serif font-bold text-brand-black mb-1">{project?.name || project?.type}</h1>
-                        <span className="text-brand-lime font-medium text-sm">{project?.clientName}</span>
+                    <div className="bg-[#B7EF02]/10 p-8 rounded-2xl border border-[#B7EF02]/20 shadow-sm">
+                        <h1 className="text-3xl font-serif font-bold text-brand-black mb-2">{project?.name || project?.type}</h1>
+                        <span className="text-brand-black font-medium text-sm px-3 py-1 bg-white rounded-full border border-[#B7EF02]/30">{project?.clientName}</span>
                     </div>
 
-                    {/* Links Card */}
-                    <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm space-y-4">
-                        <h3 className="font-bold text-gray-900 border-b pb-2 flex items-center gap-2">
-                            <ExternalLink size={16} /> Deployment
-                        </h3>
 
-                        <div>
-                            <label className="flex items-center gap-2 text-xs font-medium text-gray-500 mb-1">
-                                <Github size={14} /> Repository URL
-                            </label>
-                            <input
-                                type="text"
-                                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none bg-gray-50 font-mono text-xs"
-                                placeholder="https://github.com/..."
-                                value={githubUrl}
-                                onChange={(e) => setGithubUrl(e.target.value)}
-                                onBlur={() => handleUpdateField('githubUrl', githubUrl)}
-                            />
-                        </div>
 
-                        <div>
-                            <label className="flex items-center gap-2 text-xs font-medium text-gray-500 mb-1">
-                                <Globe size={14} /> Vercel Deployment
-                            </label>
-                            <input
-                                type="text"
-                                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none bg-gray-50 font-mono text-xs"
-                                placeholder="https://..."
-                                value={vercelUrl}
-                                onChange={(e) => setVercelUrl(e.target.value)}
-                                onBlur={() => handleUpdateField('vercelUrl', vercelUrl)}
-                            />
-                        </div>
-
-                        <div>
-                            <label className="flex items-center gap-2 text-xs font-medium text-gray-500 mb-1">
-                                <Key size={14} /> Gemini API Key (AI Studio)
-                            </label>
-                            <input
-                                type="text"
-                                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none bg-gray-50 font-mono text-xs"
-                                placeholder="AIza..."
-                                value={geminiApiKey}
-                                onChange={(e) => setGeminiApiKey(e.target.value)}
-                                onBlur={() => handleUpdateField('geminiApiKey', geminiApiKey)}
-                            />
-                        </div>
-
-                        <div>
-                            <label className="flex items-center gap-2 text-xs font-medium text-gray-500 mb-1">
-                                <Sparkles size={14} /> AI Brain Engine
-                            </label>
-                            <select
-                                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none bg-gray-50 font-mono text-xs"
-                                value={project?.aiModel || 'gemini-3.1-pro-preview'}
-                                onChange={(e) => handleUpdateField('aiModel', e.target.value)}
-                            >
-                                <option value="gemini-3.1-flash-lite-preview">⚡ Gemini 3.1 Flash-Lite (Standard)</option>
-                                <option value="gemini-3.1-pro-preview">🧠 Gemini 3.1 Pro (Vorabversion)</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    {/* Firebase Config Card */}
-                    <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm space-y-4">
-                        <div className="flex justify-between items-center border-b pb-2">
-                            <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                                <Lock size={16} /> Firebase Configuration
+                    {/* Linked Templates Card */}
+                    <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow space-y-4">
+                        <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+                            <h3 className="font-bold font-serif text-lg text-gray-900 flex items-center gap-2">
+                                <BookOpen size={18} className="text-[#B7EF02]" /> Linked Templates
                             </h3>
-                            <button
-                                onClick={handleCopyEnv}
-                                className="text-xs flex items-center gap-1 text-brand-lime hover:text-brand-black transition-colors font-medium cursor-pointer"
-                                title="Copy as .env block"
-                            >
-                                <Copy size={12} /> Copy .env
-                            </button>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-3">
+                        <div className="space-y-4">
+                            {/* Prompt Rule Selection Dropdown */}
                             <div>
-                                <label className="block text-xs font-medium text-gray-500 mb-1">apiKey</label>
-                                <input
-                                    type="text"
-                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none bg-gray-50"
-                                    value={apiKey}
-                                    onChange={(e) => setApiKey(e.target.value)}
-                                    onBlur={handleUpdateConfig}
-                                    placeholder="Pending..."
-                                />
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Antigravity Prompt</label>
+                                {selectedRuleId && rules.length > 0 && !rules.find(r => r.id === selectedRuleId) && (
+                                    <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
+                                        <AlertTriangle size={16} />
+                                        Linked Rule not found. Please select a new template.
+                                    </div>
+                                )}
+                                <select
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm font-medium focus:border-[#B7EF02] focus:ring-1 focus:ring-[#B7EF02] outline-none bg-gray-50"
+                                    value={selectedRuleId}
+                                    onChange={async (e) => {
+                                        const newPromptRuleId = e.target.value;
+                                        setSelectedRuleId(newPromptRuleId);
+                                        if (project?.id) {
+                                            try {
+                                                const correctProjectRef = doc(db, 'apps', '2h_web_solutions_central_hub_v1', 'projects', project.id);
+                                                await updateDoc(correctProjectRef, {
+                                                    promptRuleId: newPromptRuleId
+                                                });
+                                                toast.success("Prompt Template updated.");
+                                            } catch (err) {
+                                                console.error("Failed to update prompt rule id:", err);
+                                                toast.error("Failed to update Prompt Template.");
+                                            }
+                                        }
+                                    }}
+                                >
+                                    <option value="">-- Choose a template --</option>
+                                    {/* Sort rules so that rules matching the project type are at the top */}
+                                    {rules
+                                        .filter(rule => rule.category !== 'design')
+                                        .slice()
+                                        .sort((a, b) => {
+                                            const aMatches = a.category === project?.type || a.category === 'global';
+                                            const bMatches = b.category === project?.type || b.category === 'global';
+                                            if (aMatches && !bMatches) return -1;
+                                            if (!aMatches && bMatches) return 1;
+                                            return a.title.localeCompare(b.title);
+                                        })
+                                        .map(rule => (
+                                            <option key={rule.id} value={rule.id}>
+                                                {rule.title} ({rule.category})
+                                            </option>
+                                        ))
+                                    }
+                                </select>
+                                <button
+                                    onClick={handleDownloadGlobalRule}
+                                    disabled={isDownloading || !project || !selectedRuleId}
+                                    className={`mt-2 w-full flex justify-center items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 text-xs font-bold rounded-lg transition-colors ${
+                                        (!project || !selectedRuleId || isDownloading) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-200 hover:text-gray-900'
+                                    }`}
+                                >
+                                    {isDownloading ? (
+                                        <>
+                                            <div className="w-3 h-3 border-2 border-gray-500/30 border-t-gray-500 rounded-full animate-spin"></div>
+                                            Downloading...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Download size={14} />
+                                            Download Global Rule
+                                        </>
+                                    )}
+                                </button>
                             </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">authDomain</label>
-                                    <input
-                                        type="text"
-                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none bg-gray-50"
-                                        value={authDomain}
-                                        onChange={(e) => setAuthDomain(e.target.value)}
-                                        onBlur={handleUpdateConfig}
-                                        placeholder="Pending..."
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">projectId</label>
-                                    <input
-                                        type="text"
-                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none bg-gray-50"
-                                        value={fbProjectId}
-                                        onChange={(e) => setFbProjectId(e.target.value)}
-                                        onBlur={handleUpdateConfig}
-                                        placeholder="Pending..."
-                                    />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">storageBucket</label>
-                                    <input
-                                        type="text"
-                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none bg-gray-50"
-                                        value={storageBucket}
-                                        onChange={(e) => setStorageBucket(e.target.value)}
-                                        onBlur={handleUpdateConfig}
-                                        placeholder="Pending..."
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">messagingSenderId</label>
-                                    <input
-                                        type="text"
-                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none bg-gray-50"
-                                        value={messagingSenderId}
-                                        onChange={(e) => setMessagingSenderId(e.target.value)}
-                                        onBlur={handleUpdateConfig}
-                                        placeholder="Pending..."
-                                    />
-                                </div>
-                            </div>
+
+                            {/* Design Selection Dropdown */}
                             <div>
-                                <label className="block text-xs font-medium text-gray-500 mb-1">appId</label>
-                                <input
-                                    type="text"
-                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none bg-gray-50"
-                                    value={fbAppId}
-                                    onChange={(e) => setFbAppId(e.target.value)}
-                                    onBlur={handleUpdateConfig}
-                                    placeholder="Pending..."
-                                />
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Design System</label>
+                                <select
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm font-medium focus:border-[#B7EF02] focus:ring-1 focus:ring-[#B7EF02] outline-none bg-gray-50"
+                                    value={project?.designRuleId || ''}
+                                    onChange={async (e) => {
+                                        const newDesignRuleId = e.target.value;
+                                        if (project?.id) {
+                                            try {
+                                                const correctProjectRef = doc(db, 'apps', '2h_web_solutions_central_hub_v1', 'projects', project.id);
+                                                await updateDoc(correctProjectRef, {
+                                                    designRuleId: newDesignRuleId
+                                                });
+                                                toast.success("Design System updated.");
+                                            } catch (err) {
+                                                console.error("Failed to update design rule id:", err);
+                                                toast.error("Failed to update Design System.");
+                                            }
+                                        }
+                                    }}
+                                >
+                                    <option value="">-- Choose a Design System --</option>
+                                    {designSystems
+                                        .sort((a, b) => a.title.localeCompare(b.title))
+                                        .map(ds => (
+                                            <option key={ds.id} value={ds.id}>
+                                                {ds.title}
+                                            </option>
+                                        ))
+                                    }
+                                </select>
+                                <button
+                                    onClick={handleDownloadDesignRule}
+                                    disabled={isDownloadingDesign || !project || !project.designRuleId}
+                                    className={`mt-2 w-full flex justify-center items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 text-xs font-bold rounded-lg transition-colors ${
+                                        (!project || !project.designRuleId || isDownloadingDesign) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-200 hover:text-gray-900'
+                                    }`}
+                                >
+                                    {isDownloadingDesign ? (
+                                        <>
+                                            <div className="w-3 h-3 border-2 border-gray-500/30 border-t-gray-500 rounded-full animate-spin"></div>
+                                            Downloading...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Download size={14} />
+                                            Download design.md
+                                        </>
+                                    )}
+                                </button>
                             </div>
+
+                            {/* Missing Variables Fallback */}
+                            {missingKeys.length > 0 && (
+                                <div className="bg-orange-50 border border-orange-100 rounded-lg p-4 space-y-3">
+                                    <p className="text-xs font-bold text-orange-800 flex items-center gap-1.5">
+                                        <AlertTriangle size={14} /> 
+                                        Missing Variables Detected
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {missingKeys.map(key => (
+                                            <div key={key}>
+                                                <label className="block text-[10px] font-bold text-orange-700 uppercase tracking-wider mb-1">{key}</label>
+                                                <input
+                                                    type="text"
+                                                    value={missingOverrides[key] || ''}
+                                                    onChange={(e) => setMissingOverrides(prev => ({ ...prev, [key]: e.target.value }))}
+                                                    placeholder={`Enter ${key}...`}
+                                                    className="w-full px-2 py-1.5 rounded-md border border-orange-200 text-xs font-mono focus:border-orange-400 outline-none bg-white"
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Preview Area */}
+                            {selectedRuleId && (
+                                <div className="flex flex-col space-y-3">
+                                    <div className="relative border border-gray-200 rounded-lg overflow-hidden bg-[#F8F8F9]">
+                                        <div className="absolute top-2 right-2 flex gap-2">
+                                            <button
+                                                onClick={handlePromptCopy}
+                                                className="bg-white border border-gray-200 text-gray-600 hover:text-[#101010] p-1.5 rounded shadow-sm hover:shadow transition-all flex items-center gap-1"
+                                                title="Copy to Clipboard"
+                                            >
+                                                {promptCopied ? <CheckCircle2 size={14} className="text-green-500" /> : <Copy size={14} />}
+                                                <span className="text-xs font-bold">{promptCopied ? "Copied" : "Copy"}</span>
+                                            </button>
+                                        </div>
+                                        <textarea
+                                            readOnly
+                                            value={generatedPrompt}
+                                            className="w-full min-h-[400px] p-4 pt-12 text-xs font-mono text-gray-800 bg-transparent resize-y outline-none"
+                                        />
+                                    </div>
+
+                                    <button
+                                        onClick={handlePromptDownload}
+                                        className="w-full flex justify-center items-center gap-2 py-2.5 bg-[#B7EF02] text-[#101010] font-bold rounded-lg shadow-sm hover:shadow-md hover:bg-[#a3d602] transition-all"
+                                    >
+                                        <Download size={16} />
+                                        Download Prompt (.txt)
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
+
 
                     {/* Persistent Memory / Knowledge Timeline */}
-                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm flex-1 flex flex-col overflow-hidden min-h-[600px]">
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow flex-1 flex flex-col overflow-hidden min-h-[600px]">
                         {/* Tabs Header */}
                         <div className="flex border-b border-gray-100 px-6 pt-4 pb-0 gap-6">
                             <button
@@ -1216,60 +1433,19 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
 
                 {/* RIGHT COLUMN: Builder Chat */}
                 <div
-                    className="w-2/3 flex flex-col bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden relative"
+                    className="w-2/3 flex flex-col bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden relative"
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={handleDrop}
                 >
                     {/* Chat Header */}
-                    <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                    <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-[#F8F8F9]">
                         <div className="flex flex-col">
-                            <h3 className="font-bold text-brand-black flex items-center gap-2">
-                                <div className={`w-2 h-2 rounded-full ${agentMode === 'STARTER' ? 'bg-green-500' :
-                                    agentMode === 'BUILDER' ? 'bg-blue-500' :
-                                        'bg-red-500'
-                                    }`}></div>
-                                {agentMode === 'STARTER' ? 'Architect Assistant' :
-                                    agentMode === 'BUILDER' ? 'Builder Assistant' :
-                                        'Fixer Assistant'}
-                                {agentMode === 'STARTER' && (
-                                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-[10px] uppercase tracking-wider font-bold animate-pulse border border-green-200 ml-1">
-                                        <Sparkles size={10} /> Strict Mode
-                                    </span>
-                                )}
+                            <h3 className="font-bold font-serif text-brand-black flex items-center gap-2 text-xl">
+                                <div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
+                                Builder Assistant
                             </h3>
-                            <p className="text-xs text-brand-text-muted mt-0.5">
-                                {agentMode === 'STARTER' ? 'Executing 10-Step Foundation Plan' :
-                                    agentMode === 'BUILDER' ? 'Features & Logic' :
-                                        'Debugger & Fixes'}
-                            </p>
                         </div>
-                        <div className="flex items-center gap-4">
-                            {/* Mode Switcher */}
-                            <div className="flex bg-gray-100 p-1 rounded-lg">
-                                <button
-                                    onClick={() => handleModeChange('STARTER')}
-                                    className={`p-1.5 rounded-md transition-all ${agentMode === 'STARTER' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                                    title="Starter (Architect)"
-                                >
-                                    <Map size={16} />
-                                </button>
-                                <button
-                                    onClick={() => handleModeChange('BUILDER')}
-                                    className={`p-1.5 rounded-md transition-all ${agentMode === 'BUILDER' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                                    title="Builder (Features)"
-                                >
-                                    <Hammer size={16} />
-                                </button>
-                                <button
-                                    onClick={() => handleModeChange('SOLVER')}
-                                    className={`p-1.5 rounded-md transition-all ${agentMode === 'SOLVER' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                                    title="Solver (Debugger)"
-                                >
-                                    <Bug size={16} />
-                                </button>
-                            </div>
-
-                            {/* Language Switcher */}
+                        <div className="flex items-center gap-4">                            {/* Language Switcher */}
                             <div className="flex bg-gray-100 p-1 rounded-lg text-xs font-bold">
                                 <button
                                     onClick={() => handleLanguageChange('de')}
@@ -1489,7 +1665,7 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                                         {/* Text Input */}
                                         <textarea
                                             className="flex-1 px-4 py-3 rounded-xl border border-gray-200 focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none transition-all bg-gray-50 text-brand-black resize-none min-h-[46px] max-h-[200px]"
-                                            placeholder={agentMode === 'STARTER' ? "Type 'Start' to begin the 10-step Architect plan... (Ctrl+Enter to send)" : agentMode === 'BUILDER' ? "Describe the next feature to build... (Ctrl+Enter to send)" : "Paste the error code or describe the bug... (Ctrl+Enter to send)"}
+                                            placeholder="Message Builder Assistant... (Ctrl+Enter to send)"
                                             value={chatInput}
                                             onChange={(e) => setChatInput(e.target.value)}
                                             onPaste={handlePaste}

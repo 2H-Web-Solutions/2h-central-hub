@@ -5,9 +5,9 @@ import Button from '../components/Button';
 import DashboardShell from '../components/DashboardShell';
 import SidebarNav from '../components/SidebarNav';
 import SecureDeleteModal from '../components/SecureDeleteModal';
-import { Pencil, Trash2, Sparkles, Loader2, Image as ImageIcon, Scan } from 'lucide-react';
-import { extractBrandFromUrl, extractBrandFromImage } from '../lib/gemini';
+import { Pencil, Trash2, Loader2, Plus, ExternalLink, Globe, LayoutTemplate } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { designSystemService, DesignSystem } from '../services/designSystemService';
 
 interface Client {
     id: string;
@@ -21,6 +21,7 @@ interface Client {
     surfaceColor?: string;
     fontHeading?: string;
     fontBody?: string;
+    defaultDesignId?: string;
 }
 
 export default function Clients() {
@@ -37,17 +38,13 @@ export default function Clients() {
     const [website, setWebsite] = useState('');
     const [status, setStatus] = useState<'active' | 'onboarding'>('onboarding');
 
-    // Brand DNA State
-    const [primaryColor, setPrimaryColor] = useState('#B7EF02');
-    const [backgroundColor, setBackgroundColor] = useState('#101010');
-    const [surfaceColor, setSurfaceColor] = useState('#ffffff');
-    const [fontHeading, setFontHeading] = useState('Federo');
-    const [fontBody, setFontBody] = useState('Barlow');
+    const [designSystems, setDesignSystems] = useState<DesignSystem[]>([]);
+    const [defaultDesignId, setDefaultDesignId] = useState('');
 
-    // AI Brand Scanner State
-    const [isScanning, setIsScanning] = useState(false);
-    const [scannedImage, setScannedImage] = useState<string | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    // Fetch Design Systems
+    useEffect(() => {
+        designSystemService.getAllDesignSystems().then(setDesignSystems).catch(console.error);
+    }, []);
 
     // Subscribe to Clients
     useEffect(() => {
@@ -70,14 +67,9 @@ export default function Clients() {
 
     const resetForm = () => {
         setCompanyName('');
-        setWebsite('');
+        website && setWebsite('');
         setStatus('onboarding');
-        setPrimaryColor('#B7EF02');
-        setBackgroundColor('#101010');
-        setSurfaceColor('#ffffff');
-        setFontHeading('Federo');
-        setFontBody('Barlow');
-        setScannedImage(null);
+        setDefaultDesignId('');
         setEditingClient(null);
     };
 
@@ -91,11 +83,7 @@ export default function Clients() {
         setCompanyName(client.companyName);
         setWebsite(client.website);
         setStatus(client.status);
-        setPrimaryColor(client.primaryColor || '#B7EF02');
-        setBackgroundColor(client.backgroundColor || '#101010');
-        setSurfaceColor(client.surfaceColor || '#ffffff');
-        setFontHeading(client.fontHeading || 'Federo');
-        setFontBody(client.fontBody || 'Barlow');
+        setDefaultDesignId(client.defaultDesignId || '');
         setIsModalOpen(true);
     };
 
@@ -106,11 +94,7 @@ export default function Clients() {
                 companyName,
                 website,
                 status,
-                primaryColor,
-                backgroundColor,
-                surfaceColor,
-                fontHeading,
-                fontBody
+                defaultDesignId
             };
 
             if (editingClient) {
@@ -144,92 +128,41 @@ export default function Clients() {
         }
     };
 
-    const applyScannedData = (data: any) => {
-        if (data.primaryColor) setPrimaryColor(data.primaryColor);
-        if (data.backgroundColor) setBackgroundColor(data.backgroundColor);
-        if (data.surfaceColor) setSurfaceColor(data.surfaceColor);
-        if (data.fontHeading) setFontHeading(data.fontHeading);
-        if (data.fontBody) setFontBody(data.fontBody);
-    };
 
-    const handleScanUrl = async () => {
-        if (!website) return;
-        setIsScanning(true);
-        try {
-            toast.loading("Analyzing Brand DNA...", { id: 'scan' });
-            const refinedData = await extractBrandFromUrl(website);
-            applyScannedData(refinedData);
-            toast.success("Brand DNA extracted!", { id: 'scan' });
-        } catch (error) {
-            console.error(error);
-            toast.error("Scan failed. Please try again.", { id: 'scan' });
-        } finally {
-            setIsScanning(false);
-        }
-    };
-
-    const handleScanImage = async (base64: string) => {
-        setIsScanning(true);
-        setScannedImage(base64);
-        try {
-            toast.loading("Analyzing Screenshot...", { id: 'scan' });
-            const refinedData = await extractBrandFromImage(base64);
-            applyScannedData(refinedData);
-            toast.success("Brand DNA extracted!", { id: 'scan' });
-        } catch (error) {
-            console.error(error);
-            toast.error("Scan failed. Please try again.", { id: 'scan' });
-        } finally {
-            setIsScanning(false);
-        }
-    };
-
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files.length > 0) {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = () => {
-                if (reader.result) handleScanImage(reader.result as string);
-            };
-        }
-    };
-
-    const handlePaste = (e: React.ClipboardEvent) => {
-        const items = e.clipboardData.items;
-        for (let i = 0; i < items.length; i++) {
-            if (items[i].type.indexOf('image') !== -1) {
-                const file = items[i].getAsFile();
-                if (file) {
-                    const reader = new FileReader();
-                    reader.readAsDataURL(file);
-                    reader.onload = () => {
-                        if (reader.result) handleScanImage(reader.result as string);
-                    };
-                }
-            }
-        }
-    };
 
     return (
         <DashboardShell
             headerTitle="Client Management"
             sidebarContent={<SidebarNav />}
             headerActions={
-                <Button onClick={handleOpenAdd}>Add Client</Button>
+                <button 
+                    onClick={handleOpenAdd}
+                    className="flex items-center gap-2 bg-brand-lime text-brand-black px-6 py-2.5 rounded-full font-bold hover:bg-[#a3d600] transition-colors shadow-sm"
+                >
+                    <Plus size={18} />
+                    <span>Add Client</span>
+                </button>
             }
         >
+            {/* Welcome Section */}
+            <section className="mb-10">
+                <h2 className="font-serif text-5xl text-brand-black mb-2 tracking-tight">Client Directory</h2>
+                <p className="font-sans text-brand-text-muted max-w-2xl text-lg">Manage all connected workspaces, brand identities, and active environments within the ecosystem.</p>
+            </section>
+
             {/* List */}
             {loading ? (
-                <p className="text-brand-text-muted">Loading clients...</p>
+                <div className="flex items-center justify-center py-20">
+                    <Loader2 className="w-8 h-8 animate-spin text-brand-lime" />
+                </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {clients.map(client => (
-                        <div key={client.id} className="bg-white border border-gray-100 rounded-xl p-6 shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
+                        <div key={client.id} className="bg-white p-6 rounded-2xl shadow-sm border border-transparent hover:border-brand-lime transition-all relative overflow-hidden group flex flex-col h-full">
                             {/* Brand DNA Preview Dot */}
                             {client.primaryColor && (
                                 <div
-                                    className="absolute top-0 right-0 w-16 h-16 opacity-10 rounded-bl-full pointer-events-none"
+                                    className="absolute top-0 right-0 w-24 h-24 opacity-5 rounded-bl-full pointer-events-none"
                                     style={{ backgroundColor: client.primaryColor }}
                                 ></div>
                             )}
@@ -238,50 +171,84 @@ export default function Clients() {
                             <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                                 <button
                                     onClick={(e) => { e.stopPropagation(); handleOpenEdit(client); }}
-                                    className="p-2 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition-colors"
+                                    className="p-2 bg-gray-50 text-gray-600 rounded-full hover:bg-white hover:text-brand-lime transition-all shadow-sm border border-gray-100"
                                     title="Edit Client"
                                 >
-                                    <Pencil size={16} />
+                                    <Pencil size={14} />
                                 </button>
                                 <button
                                     onClick={(e) => { e.stopPropagation(); setDeletingClientId(client.id); }}
-                                    className="p-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors"
+                                    className="p-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-all shadow-sm border border-red-100"
                                     title="Delete Client"
                                 >
-                                    <Trash2 size={16} />
+                                    <Trash2 size={14} />
                                 </button>
                             </div>
 
-                            <div className="flex justify-between items-start mb-4 pr-16">
+                            <div className="flex justify-between items-start mb-6 pr-16">
                                 <div className="flex items-center gap-3">
-                                    {client.primaryColor && (
+                                    {client.primaryColor ? (
                                         <div
-                                            className="w-3 h-3 rounded-full shadow-sm ring-1 ring-gray-100"
+                                            className="w-10 h-10 rounded-xl shadow-sm flex items-center justify-center text-white font-bold text-lg"
                                             style={{ backgroundColor: client.primaryColor }}
                                             title="Brand Primary Color"
-                                        ></div>
+                                        >
+                                            {client.companyName.charAt(0).toUpperCase()}
+                                        </div>
+                                    ) : (
+                                        <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-gray-500 font-bold text-lg shadow-sm">
+                                            {client.companyName.charAt(0).toUpperCase()}
+                                        </div>
                                     )}
-                                    <h3 className="text-xl font-serif font-bold text-brand-black truncate">{client.companyName}</h3>
+                                    <div>
+                                        <h3 className="text-xl font-serif font-bold text-brand-black tracking-tight">{client.companyName}</h3>
+                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                            <span className={`w-2 h-2 rounded-full ${client.status === 'active' ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+                                            <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">{client.status}</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="flex justify-between items-center mt-2">
-                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${client.status === 'active'
-                                    ? 'bg-emerald-100 text-emerald-700'
-                                    : 'bg-amber-100 text-amber-700'
-                                    }`}>
-                                    {client.status.toUpperCase()}
-                                </span>
-                                <a href={client.website} target="_blank" rel="noreferrer" className="text-sm text-brand-text-muted hover:text-brand-lime transition-colors truncate max-w-[150px]">
-                                    {client.website}
-                                </a>
+                            {/* Info Area */}
+                            <div className="flex-grow space-y-4">
+                                <div>
+                                    <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 flex items-center gap-1"><Globe size={10} /> Website</h4>
+                                    <a href={client.website} target="_blank" rel="noreferrer" className="text-sm text-brand-black hover:text-brand-lime transition-colors truncate max-w-full inline-flex items-center gap-1.5 font-medium bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 w-full">
+                                        <span className="truncate">{client.website.replace(/^https?:\/\//, '')}</span>
+                                        <ExternalLink size={12} className="flex-shrink-0 text-gray-400" />
+                                    </a>
+                                </div>
+
+                                {/* DNA Preview Area */}
+                                {client.primaryColor && (
+                                    <div>
+                                        <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 flex items-center gap-1"><LayoutTemplate size={10} /> Brand DNA</h4>
+                                        <div className="flex gap-2 items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
+                                            <div className="flex -space-x-1">
+                                                <div className="w-5 h-5 rounded-full ring-2 ring-white shadow-sm" style={{ backgroundColor: client.primaryColor }} title="Primary"></div>
+                                                <div className="w-5 h-5 rounded-full ring-2 ring-white shadow-sm" style={{ backgroundColor: client.backgroundColor || '#101010' }} title="Background"></div>
+                                                <div className="w-5 h-5 rounded-full ring-2 ring-white shadow-sm border border-gray-200" style={{ backgroundColor: client.surfaceColor || '#ffffff' }} title="Surface"></div>
+                                            </div>
+                                            <span className="text-[10px] font-medium text-gray-500 px-1 truncate flex-grow">
+                                                {client.fontHeading} • {client.fontBody}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))}
 
                     {clients.length === 0 && (
-                        <div className="col-span-full text-center py-12 text-brand-text-muted">
-                            No clients found. Add your first one!
+                        <div className="col-span-full bg-white rounded-2xl border border-dashed border-gray-300 p-12 text-center flex flex-col items-center justify-center gap-4 group hover:border-brand-lime transition-colors cursor-pointer" onClick={handleOpenAdd}>
+                            <div className="w-16 h-16 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:text-brand-lime group-hover:bg-[#f5ffcc] transition-colors">
+                                <Plus size={32} />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-serif font-bold text-brand-black mb-1">No Clients Found</h3>
+                                <p className="text-sm text-gray-500 max-w-sm mx-auto">Get started by creating your first client workspace. You can extract their Brand DNA automatically from their website.</p>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -333,145 +300,25 @@ export default function Clients() {
                             </div>
 
                             {/* Brand DNA */}
-                            {/* Brand DNA */}
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center border-b pb-2">
                                     <h4 className="text-sm font-bold text-gray-900">Brand Identity (DNA)</h4>
                                 </div>
 
-                                {/* AI Brand Scanner */}
-                                <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4" onPaste={handlePaste}>
-                                    <div className="flex justify-between items-center mb-3">
-                                        <label className="text-sm font-bold text-indigo-700 flex items-center gap-1.5">
-                                            <Scan size={16} />
-                                            AI Brand Scanner
-                                        </label>
-                                        {isScanning && (
-                                            <span className="text-xs text-indigo-500 flex items-center gap-1 animate-pulse font-medium">
-                                                <Loader2 size={12} className="animate-spin" /> Analyzing...
-                                            </span>
-                                        )}
-                                    </div>
 
-                                    <div className="flex gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={handleScanUrl}
-                                            disabled={isScanning || !website}
-                                            className="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm"
-                                        >
-                                            <Sparkles size={16} /> Scan URL
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => fileInputRef.current?.click()}
-                                            disabled={isScanning}
-                                            className="flex-1 px-4 py-2.5 bg-white text-indigo-600 border border-indigo-200 rounded-lg text-sm font-medium hover:bg-indigo-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm"
-                                        >
-                                            <ImageIcon size={16} /> Upload / Paste Screenshot
-                                        </button>
-                                        <input
-                                            type="file"
-                                            ref={fileInputRef}
-                                            className="hidden"
-                                            accept="image/*"
-                                            onChange={handleFileSelect}
-                                        />
-                                    </div>
-
-                                    {/* Thumbnail Preview */}
-                                    {scannedImage && (
-                                        <div className="mt-3 relative inline-block">
-                                            <img src={scannedImage} alt="Scanned Brand" className="h-[72px] rounded border border-indigo-200 shadow-sm" />
-                                            <button
-                                                type="button"
-                                                onClick={() => setScannedImage(null)}
-                                                className="absolute -top-2 -right-2 bg-white text-red-500 rounded-full shadow border border-gray-100 p-1 hover:bg-red-50 hover:text-red-600 transition-colors"
-                                                title="Remove Image"
-                                            >
-                                                <Trash2 size={12} />
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Colors */}
-                                <div className="grid grid-cols-3 gap-3">
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-500 mb-1">Primary Color</label>
-                                        <div className="flex items-center gap-2">
-                                            <input
-                                                type="color"
-                                                className="w-8 h-8 rounded cursor-pointer border-none p-0"
-                                                value={primaryColor}
-                                                onChange={(e) => setPrimaryColor(e.target.value)}
-                                            />
-                                            <input
-                                                type="text"
-                                                className="w-full text-xs border border-gray-200 rounded px-2 py-1"
-                                                value={primaryColor}
-                                                onChange={(e) => setPrimaryColor(e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-500 mb-1">Background</label>
-                                        <div className="flex items-center gap-2">
-                                            <input
-                                                type="color"
-                                                className="w-8 h-8 rounded cursor-pointer border-none p-0"
-                                                value={backgroundColor}
-                                                onChange={(e) => setBackgroundColor(e.target.value)}
-                                            />
-                                            <input
-                                                type="text"
-                                                className="w-full text-xs border border-gray-200 rounded px-2 py-1"
-                                                value={backgroundColor}
-                                                onChange={(e) => setBackgroundColor(e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-500 mb-1">Surface</label>
-                                        <div className="flex items-center gap-2">
-                                            <input
-                                                type="color"
-                                                className="w-8 h-8 rounded cursor-pointer border-none p-0"
-                                                value={surfaceColor}
-                                                onChange={(e) => setSurfaceColor(e.target.value)}
-                                            />
-                                            <input
-                                                type="text"
-                                                className="w-full text-xs border border-gray-200 rounded px-2 py-1"
-                                                value={surfaceColor}
-                                                onChange={(e) => setSurfaceColor(e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Fonts */}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-500 mb-1">Heading Font</label>
-                                        <input
-                                            type="text"
-                                            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none transition-all bg-gray-50 text-brand-black"
-                                            placeholder="e.g., Federo"
-                                            value={fontHeading}
-                                            onChange={(e) => setFontHeading(e.target.value)}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-500 mb-1">Body Font</label>
-                                        <input
-                                            type="text"
-                                            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none transition-all bg-gray-50 text-brand-black"
-                                            placeholder="e.g., Inter"
-                                            value={fontBody}
-                                            onChange={(e) => setFontBody(e.target.value)}
-                                        />
-                                    </div>
+                                {/* Default Design System */}
+                                <div className="pt-2">
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Default Design System</label>
+                                    <select
+                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-brand-lime focus:ring-1 focus:ring-brand-lime outline-none transition-all bg-gray-50 text-brand-black"
+                                        value={defaultDesignId}
+                                        onChange={(e) => setDefaultDesignId(e.target.value)}
+                                    >
+                                        <option value="">-- No Default Design System --</option>
+                                        {designSystems.map(ds => (
+                                            <option key={ds.id} value={ds.id}>{ds.title}</option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
 

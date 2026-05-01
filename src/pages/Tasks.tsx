@@ -211,27 +211,27 @@ export default function Tasks() {
             draggable
             onDragStart={() => setDraggedTask(task)}
             onClick={() => openEditModal(task)}
-            className="group bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-brand-lime/50 transition-all cursor-pointer active:scale-[0.98]"
+            className="group bg-white p-5 rounded-2xl shadow-sm border border-transparent hover:border-brand-lime transition-all cursor-pointer active:scale-[0.98] flex flex-col gap-3 relative overflow-hidden"
         >
-            <div className="flex justify-between items-start mb-2">
-                <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${getPriorityColor(task.priority)}`}>
+            <div className="flex justify-between items-start">
+                <span className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border ${getPriorityColor(task.priority)}`}>
                     {task.priority}
                 </span>
                 {task.sourceAppId !== '2h_hub_v1' && (
-                    <span className="text-[10px] font-medium bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full border border-gray-200">
+                    <span className="text-[10px] font-bold bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full uppercase tracking-widest">
                         {formatAppId(task.sourceAppId)}
                     </span>
                 )}
             </div>
-            <h4 className="font-bold text-base text-gray-900 mb-1 leading-tight group-hover:text-brand-lime transition-colors">
+            <h4 className="font-serif font-bold text-lg text-brand-black leading-tight group-hover:text-brand-lime transition-colors mt-1">
                 {task.title}
             </h4>
-            <div className="flex justify-between items-center mt-3">
-                <span className="text-xs font-medium text-gray-500 bg-gray-50 px-2 py-1 rounded">
+            <div className="flex justify-between items-center mt-auto pt-2">
+                <span className="text-[10px] font-bold text-gray-500 bg-gray-50 px-2.5 py-1 rounded-full border border-gray-100 uppercase tracking-widest truncate max-w-[120px]">
                     {task.assignedClient}
                 </span>
                 {task.dueDate && (
-                    <span className={`text-xs flex items-center gap-1 ${task.dueDate < new Date() ? 'text-red-500 font-bold' : 'text-gray-400'}`}>
+                    <span className={`text-xs font-medium flex items-center gap-1.5 ${task.dueDate < new Date() ? 'text-red-500 font-bold' : 'text-gray-400'}`}>
                         <Calendar size={12} />
                         {task.dueDate.toLocaleDateString()}
                     </span>
@@ -240,48 +240,54 @@ export default function Tasks() {
         </div>
     );
 
-    const Column = ({ title, status, icon: Icon }: { title: string, status: 'todo' | 'in_progress' | 'done', icon: any }) => {
-        const items = filteredTasks.filter(t => t.status === status);
-        return (
-            <div
-                className="flex flex-col h-full min-w-[320px] w-full"
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={() => handleDrop(status)}
-            >
-                <div className="flex items-center justify-between mb-4 px-1">
-                    <h3 className="font-serif font-bold text-lg text-gray-900 flex items-center gap-2">
-                        {Icon && <Icon size={20} className="text-brand-lime" />}
-                        {title}
-                    </h3>
-                    <span className="bg-gray-100 text-gray-600 text-xs font-bold px-2 py-1 rounded-full">
-                        {items.length}
-                    </span>
+        const Column = ({ title, status, icon: Icon }: { title: string, status: 'todo' | 'in_progress' | 'done', icon: any }) => {
+            const items = filteredTasks.filter(t => t.status === status);
+            return (
+                <div
+                    className="flex flex-col h-full min-w-[320px] w-full"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => handleDrop(status)}
+                >
+                    <div className="flex items-center justify-between mb-4 px-1">
+                        <h3 className="font-serif font-bold text-xl text-gray-900 flex items-center gap-2">
+                            {Icon && <Icon size={20} className="text-brand-lime" />}
+                            {title}
+                        </h3>
+                        <span className="bg-white text-gray-900 text-xs font-bold px-2.5 py-1 rounded-full shadow-sm border border-gray-100">
+                            {items.length}
+                        </span>
+                    </div>
+                    <div className={`flex-1 overflow-y-auto p-2 space-y-4 rounded-2xl transition-colors ${draggedTask ? 'bg-gray-50/50 border-2 border-dashed border-gray-200' : ''}`}>
+                        {items.map(task => <TaskCard key={task.id} task={task} />)}
+                        {items.length === 0 && (
+                            <div className="h-32 flex flex-col items-center justify-center text-gray-300 border border-dashed border-gray-300 rounded-2xl bg-white/50">
+                                <p className="text-sm font-medium">No Tasks</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
-                <div className={`flex-1 overflow-y-auto p-2 space-y-3 rounded-2xl transition-colors ${draggedTask ? 'bg-gray-50/50 dashed-border' : ''}`}>
-                    {items.map(task => <TaskCard key={task.id} task={task} />)}
-                    {items.length === 0 && (
-                        <div className="h-32 flex flex-col items-center justify-center text-gray-300 border-2 border-dashed border-gray-100 rounded-xl">
-                            <p className="text-sm font-medium">No Tasks</p>
-                        </div>
-                    )}
-                </div>
-            </div>
-        );
-    };
+            );
+        };
 
     return (
         <DashboardShell headerTitle="Global Task Board" sidebarContent={<SidebarNav />}>
-            <div className="flex flex-col h-[calc(100vh-140px)]">
+            <div className="flex flex-col h-[calc(100vh-100px)]">
+                
+                {/* Welcome Section */}
+                <section className="mb-8 shrink-0">
+                    <h2 className="font-serif text-5xl text-brand-black mb-2 tracking-tight">Task Center</h2>
+                    <p className="font-sans text-brand-text-muted max-w-2xl text-lg">Centralized Kanban board for monitoring and managing tasks across all connected workspaces.</p>
+                </section>
 
                 {/* Toolbar */}
-                <div className="bg-white border-b border-gray-100 p-4 flex flex-wrap gap-4 items-center justify-between shrink-0">
+                <div className="bg-white border border-gray-100 p-4 rounded-2xl shadow-sm flex flex-wrap gap-4 items-center justify-between shrink-0 mb-6">
                     <div className="flex items-center gap-4 flex-1 min-w-[200px]">
                         <div className="relative flex-1 max-w-md">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                             <input
                                 type="text"
                                 placeholder="Search tasks or clients..."
-                                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-1 focus:ring-brand-lime focus:border-brand-lime outline-none transition-all"
+                                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-1 focus:ring-brand-lime focus:border-brand-lime outline-none transition-all"
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
                             />
@@ -289,7 +295,7 @@ export default function Tasks() {
                         <div className="relative">
                             <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                             <select
-                                className="pl-10 pr-8 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:ring-brand-lime outline-none cursor-pointer hover:border-gray-300 appearance-none font-medium text-gray-700"
+                                className="pl-10 pr-8 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-1 focus:ring-brand-lime outline-none cursor-pointer hover:border-gray-300 appearance-none font-medium text-gray-700"
                                 value={selectedAppFilter}
                                 onChange={e => setSelectedAppFilter(e.target.value)}
                             >
@@ -297,9 +303,13 @@ export default function Tasks() {
                             </select>
                         </div>
                     </div>
-                    <Button onClick={openCreateModal} className="shrink-0 flex items-center gap-2">
-                        <Plus size={18} /> New Task
-                    </Button>
+                    <button 
+                        onClick={openCreateModal} 
+                        className="flex items-center gap-2 bg-brand-lime text-brand-black px-6 py-2.5 rounded-full font-bold hover:bg-[#a3d600] transition-colors shadow-sm shrink-0"
+                    >
+                        <Plus size={18} />
+                        <span>New Task</span>
+                    </button>
                 </div>
 
                 {/* Kanban Board */}

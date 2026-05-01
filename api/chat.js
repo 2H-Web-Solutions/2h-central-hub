@@ -2,31 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // --- PERSONA DEFINITIONS ---
 const PROMPTS = {
-  // 1. THE ARCHITECT (Remains strict for setup)
-  STARTER: `
-ROLE: You are the "Architect"(Starter Assistant).
-  GOAL: Guide the user strictly from Project Init to First Live Deployment.
-    TONE: Static, precise, authoritative.No small talk.
-      INSTRUCTIONS: Check History.Find last step.Generate Prompt for NEXT step.
-
-  *** 10 - STEP PROTOCOL & UI RULES ***
-    Deine einzige Aufgabe ist es, das App - Fundament aufzubauen.Arbeite strikt diesen Plan ab und nenne dem User immer deinen aktuellen Schritt:
-- Schritt 1: Dependencies(React Router, Firebase, Lucide, Markdown) installieren.
-  - Schritt 2: Tailwind DNA(Hex Codes aus dem Kontext) in tailwind.config.js & index.css verankern.
-  - Schritt 3: Firebase Connector(src / lib / firebase.ts) aufsetzen.
-  - Schritt 4: Das 2H - Shell Layout(Sidebar, Header, DashboardShell) generieren.
-  - Schritt 5: ZWINGENDE UI - REGELN integrieren: 
-    a) Jedes Code -/Datenfeld braucht einen Copy-to-Clipboard Button oben rechts. 
-    b) Chat - Eingaben senden bei "Ctrl+Enter", "Enter" macht einen Zeilenumbruch.
-  c) Image - Uploads(Screenshots) werden direkt als Base64 - Strings ans Frontend / KI übergeben, NICHT in den Firebase Storage laden!
-    - Schritt 6: Global Task Sync Route einbauen(falls aktiviert).
-  - Schritt 7: React Router Setup(App.tsx) mit Platzhalter - Seiten.
-  - Schritt 8: Saubere.gitignore erstellen.
-  - Schritt 9: vercel.json für SPA - Rewrites anlegen.
-  - Schritt 10: Bestätigen, dass das Fundament steht und Übergabe an den "BUILDER" Modus empfehlen.
-  `,
-
-  // 2. THE CRITICAL COACH (Builder) - HEAVILY UPGRADED
+  // 1. THE CRITICAL COACH (Builder) - HEAVILY UPGRADED
   BUILDER: `
 ROLE: You are a "Critical Implementation Strategist".
   GOAL: Solve the problem efficiently.Do not annoy the user with bureaucracy.
@@ -77,13 +53,6 @@ ROLE: You are a "Critical Implementation Strategist".
 
   TONE:
   - Precise, direct, action-oriented.
-  `,
-
-  // 3. THE FIXER
-  SOLVER: `
-  ROLE: You are the "Fixer" (Problem Solver).
-  GOAL: Diagnose and repair errors based on logs.
-  TONE: Analytical, direct.
   `
 };
 
@@ -192,16 +161,8 @@ export default async function handler(req, res) {
 
     const genAI = new GoogleGenerativeAI(apiKey);
 
-    const selectedMode = agentMode || 'BUILDER';
-
-    let modeDirective = "";
-    if (selectedMode === 'STARTER') {
-      modeDirective = "Du bist der ARCHITECT. Erfinde KEINE eigenen Features. Arbeite ausschließlich den 10-Punkte-Plan aus dem System-Kontext ab. Starte jede Antwort mit der Info, in welchem Schritt du dich befindest.";
-    } else if (selectedMode === 'BUILDER') {
-      modeDirective = "Du bist der BUILDER. Das Fundament der App steht. Deine Aufgabe ist es nun, Features, Business-Logik und API/n8n-Anbindungen im Design des Clients zu programmieren.";
-    } else if (selectedMode === 'SOLVER') {
-      modeDirective = "Du bist der SOLVER. Analysiere Fehler, repariere Code und behebe Bugs. Schreibe keine neuen großen Features.";
-    }
+    const selectedMode = 'BUILDER';
+    const modeDirective = "Du bist der BUILDER. Das Fundament der App steht. Deine Aufgabe ist es nun, Features, Business-Logik und API/n8n-Anbindungen im Design des Clients zu programmieren.";
 
     // Construct System Instruction including Context
     const UNIVERSAL_TRUTH = `
@@ -237,11 +198,7 @@ export default async function handler(req, res) {
     // *** GEMINI 3.1 STRICT MODEL SELECTION ***
     const allowedModels = ['gemini-3.1-flash-lite-preview', 'gemini-3.1-pro-preview'];
     let selectedModel = allowedModels.includes(aiModel) ? aiModel : 'gemini-3.1-pro-preview';
-
-    // Force gemini-3.1-pro-preview for ARCHITECT and BUILDER
-    if (selectedMode === 'STARTER' || selectedMode === 'BUILDER') {
-      selectedModel = 'gemini-3.1-pro-preview';
-    }
+    selectedModel = 'gemini-3.1-pro-preview';
 
     // MAP TO ACTUAL GOOGLE MODELS
     const actualModel = 'gemini-3.1-pro-preview';

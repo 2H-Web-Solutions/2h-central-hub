@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, CheckSquare, Bot, Briefcase, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, CheckSquare, Bot, Briefcase, Settings, LogOut, BookOpen, Palette } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function SidebarNav() {
@@ -37,6 +37,28 @@ export default function SidebarNav() {
                 >
                     <Settings size={18} />
                     Settings
+                </Link>
+
+                <Link
+                    to="/settings/rules"
+                    className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium transition-all ${location.pathname.startsWith('/settings/rules')
+                            ? 'text-brand-lime bg-brand-lime/10 border border-brand-lime/20'
+                            : 'text-gray-400 hover:text-white hover:bg-white/5'
+                        }`}
+                >
+                    <BookOpen size={18} />
+                    Rules
+                </Link>
+
+                <Link
+                    to="/settings/design-systems"
+                    className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium transition-all ${location.pathname.startsWith('/settings/design-systems')
+                            ? 'text-brand-lime bg-brand-lime/10 border border-brand-lime/20'
+                            : 'text-gray-400 hover:text-white hover:bg-white/5'
+                        }`}
+                >
+                    <Palette size={18} />
+                    Design Systems
                 </Link>
             </div>
             

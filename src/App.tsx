@@ -7,6 +7,10 @@ import Agents from './pages/Agents';
 import Projects from './pages/Projects';
 import ProjectDetails from './pages/ProjectDetails';
 import Login from './pages/Login';
+import RulesDashboard from './pages/settings/RulesDashboard';
+import RuleEditor from './pages/settings/RuleEditor';
+import DesignSystemsDashboard from './pages/settings/DesignSystemsDashboard';
+import DesignSystemEditor from './pages/settings/DesignSystemEditor';
 
 import { Toaster } from 'react-hot-toast';
 
@@ -31,6 +35,12 @@ function App() {
                 <Route path="/agents" element={<ProtectedRoute><Agents /></ProtectedRoute>} />
                 <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
                 <Route path="/projects/:projectId" element={<ProtectedRoute><ProjectDetails /></ProtectedRoute>} />
+                
+                {/* Settings / Rules */}
+                <Route path="/settings/rules" element={<ProtectedRoute><RulesDashboard /></ProtectedRoute>} />
+                <Route path="/settings/rules/:id" element={<ProtectedRoute><RuleEditor /></ProtectedRoute>} />
+                <Route path="/settings/design-systems" element={<ProtectedRoute><DesignSystemsDashboard /></ProtectedRoute>} />
+                <Route path="/settings/design-systems/:id" element={<ProtectedRoute><DesignSystemEditor /></ProtectedRoute>} />
             </Routes>
         </>
     );

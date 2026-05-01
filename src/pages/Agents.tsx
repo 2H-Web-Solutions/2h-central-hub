@@ -134,13 +134,13 @@ export default function Agents() {
             headerTitle="Agent Mission Control"
             sidebarContent={<SidebarNav />}
         >
-            <div className="flex h-[calc(100vh-140px)] rounded-xl border border-gray-200 overflow-hidden shadow-sm bg-white">
+            <div className="flex h-[calc(100vh-140px)] rounded-2xl border border-gray-100 overflow-hidden shadow-sm bg-white hover:shadow-md transition-shadow">
 
                 {/* LEFT: Sidebar (Grouped List) */}
-                <div className="w-[300px] flex-shrink-0 bg-gray-50/50 border-r border-gray-100 flex flex-col">
-                    <div className="p-4 border-b border-gray-100 bg-white sticky top-0 z-10">
-                        <h3 className="font-serif font-bold text-lg text-brand-black flex items-center gap-2">
-                            <Sparkles size={18} className="text-brand-lime" />
+                <div className="w-[300px] flex-shrink-0 bg-[#F8F8F9] border-r border-gray-100 flex flex-col">
+                    <div className="p-5 border-b border-gray-100 bg-white sticky top-0 z-10 rounded-tl-2xl">
+                        <h3 className="font-serif font-bold text-xl text-brand-black flex items-center gap-2">
+                            <Sparkles size={20} className="text-brand-lime" />
                             Active Agents
                         </h3>
                     </div>
@@ -158,17 +158,17 @@ export default function Agents() {
                                         {formatAppId(appId)}
                                     </div>
                                     <div className="space-y-1 pl-2 border-l-2 border-gray-100 ml-2">
-                                        {appSessions.map(session => (
+                                        {appSessions.map((session) => (
                                             <div
                                                 key={session.id}
                                                 onClick={() => setActiveSession(session)}
-                                                className={`p-3 rounded-lg cursor-pointer transition-all border ${activeSession?.id === session.id
+                                                className={`p-3 rounded-xl cursor-pointer transition-all border ${activeSession?.id === session.id
                                                     ? 'bg-white border-brand-lime shadow-sm ring-1 ring-brand-lime/20'
                                                     : 'bg-transparent border-transparent hover:bg-white hover:border-gray-200 hover:shadow-sm'
                                                     }`}
                                             >
-                                                <div className="flex justify-between items-start mb-0.5">
-                                                    <h4 className={`text-sm font-medium truncate pr-2 ${activeSession?.id === session.id ? 'text-brand-black' : 'text-gray-700'}`}>
+                                                <div className="flex justify-between items-start mb-1">
+                                                    <h4 className={`text-sm font-medium font-serif truncate pr-2 ${activeSession?.id === session.id ? 'text-brand-black' : 'text-gray-700'}`}>
                                                         {session.agentName}
                                                     </h4>
                                                 </div>
@@ -189,11 +189,11 @@ export default function Agents() {
                     {activeSession ? (
                         <>
                             {/* Chat Header */}
-                            <div className="h-16 px-6 border-b border-gray-100 flex justify-between items-center bg-white">
+                            <div className="h-16 px-8 border-b border-gray-100 flex justify-between items-center bg-white rounded-tr-2xl">
                                 <div>
-                                    <h3 className="font-bold text-brand-black text-lg">{activeSession.agentName}</h3>
-                                    <p className="text-xs text-gray-500 flex items-center gap-1.5">
-                                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                                    <h3 className="font-bold font-serif text-brand-black text-xl">{activeSession.agentName}</h3>
+                                    <p className="text-xs text-gray-500 flex items-center gap-1.5 font-medium">
+                                        <span className="w-2 h-2 rounded-full bg-brand-lime animate-pulse"></span>
                                         Connected to {formatAppId(activeSession.appId)}
                                     </p>
                                 </div>
@@ -246,12 +246,12 @@ export default function Agents() {
                             </div>
 
                             {/* Input Area */}
-                            <div className="p-6 bg-white border-t border-gray-100">
+                            <div className="p-6 bg-white border-t border-gray-100 rounded-br-2xl">
                                 <form onSubmit={sendMessage} className="relative flex gap-3 max-w-4xl mx-auto">
                                     <div className="flex-1 relative group">
                                         <input
                                             type="text"
-                                            className="w-full pl-6 pr-14 py-4 rounded-full border border-gray-200 focus:border-brand-lime focus:ring-4 focus:ring-brand-lime/10 outline-none transition-all bg-gray-50 text-brand-black placeholder-gray-400 font-medium"
+                                            className="w-full pl-6 pr-14 py-4 rounded-full border border-gray-200 focus:border-brand-lime focus:ring-4 focus:ring-brand-lime/10 outline-none transition-all bg-[#F8F8F9] text-brand-black placeholder-gray-400 font-medium"
                                             placeholder={`Reply to ${activeSession.agentName}...`}
                                             value={input}
                                             onChange={(e) => setInput(e.target.value)}
