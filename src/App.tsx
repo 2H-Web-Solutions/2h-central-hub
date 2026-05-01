@@ -13,6 +13,8 @@ import DesignSystemsDashboard from './pages/settings/DesignSystemsDashboard';
 import DesignSystemEditor from './pages/settings/DesignSystemEditor';
 
 import { Toaster } from 'react-hot-toast';
+import { useEffect } from 'react';
+import { recoverData } from './utils/recoverData';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
     const { user } = useAuth();
@@ -23,6 +25,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+    useEffect(() => {
+        // Run one-time recovery
+        recoverData();
+    }, []);
+
     return (
         <>
             <Toaster position="top-right" />
