@@ -922,9 +922,6 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
 
             // 5. Cleanup
             await handleWipeChat(true);
-            if (agentMode === 'STARTER') {
-                handleModeChange('BUILDER');
-            }
 
         } catch (error) {
             console.error("Archive failed:", error);
@@ -1481,10 +1478,7 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
 
                                 <button
                                     onClick={handleSmartArchive}
-                                    className={`text-xs font-medium bg-white border px-3 py-1.5 rounded-lg flex items-center gap-2 transition-colors shadow-sm ${agentMode === 'STARTER'
-                                        ? 'border-brand-lime text-brand-black ring-2 ring-brand-lime/20 animate-pulse'
-                                        : 'border-gray-200 text-gray-500 hover:text-brand-lime'
-                                        }`}
+                                    className="text-xs font-medium bg-white border px-3 py-1.5 rounded-lg flex items-center gap-2 transition-colors shadow-sm border-gray-200 text-gray-500 hover:text-brand-lime"
                                     title="Sync memory to n8n & Clear"
                                 >
                                     <Archive size={14} /> Smart Archive
