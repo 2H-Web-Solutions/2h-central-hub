@@ -365,7 +365,7 @@ VITE_FIREBASE_APP_ID=${firebaseConfig.appId || 'Pending'}
         if (!successProject || !successProject.defaultRuleId) return;
         setIsDownloadingGlobalRule(true);
         try {
-            const ruleDoc = await getDoc(doc(db, 'apps', '2h_web_solutions_central_hub_v1', 'rules', successProject.defaultRuleId));
+            const ruleDoc = await getDoc(doc(db, 'apps', '2h_hub_v1', 'rules', successProject.defaultRuleId));
             if (ruleDoc.exists()) {
                 const rule = { id: ruleDoc.id, ...ruleDoc.data() } as Rule;
                 
@@ -402,7 +402,7 @@ VITE_FIREBASE_APP_ID=${firebaseConfig.appId || 'Pending'}
         if (!successProject || !successProject.designRuleId) return;
         setIsDownloadingDesign(true);
         try {
-            const designDoc = await getDoc(doc(db, 'apps', '2h_web_solutions_central_hub_v1', 'design_systems', successProject.designRuleId));
+            const designDoc = await getDoc(doc(db, 'apps', '2h_hub_v1', 'design_systems', successProject.designRuleId));
             if (designDoc.exists()) {
                 const designContent = designDoc.data().content;
                 

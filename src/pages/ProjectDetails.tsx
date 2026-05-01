@@ -244,7 +244,7 @@ export default function ProjectDetails() {
         setIsDownloading(true);
 
         try {
-            const ruleDocRef = doc(db, 'apps', '2h_web_solutions_central_hub_v1', 'rules', 'global_app_rule');
+            const ruleDocRef = doc(db, 'apps', '2h_hub_v1', 'rules', 'global_app_rule');
             const ruleSnap = await getDoc(ruleDocRef);
 
             if (!ruleSnap.exists()) {
@@ -1045,7 +1045,7 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                                         setSelectedRuleId(newPromptRuleId);
                                         if (project?.id) {
                                             try {
-                                                const correctProjectRef = doc(db, 'apps', '2h_web_solutions_central_hub_v1', 'projects', project.id);
+                                                const correctProjectRef = doc(db, 'apps', '2h_hub_v1', 'projects', project.id);
                                                 await updateDoc(correctProjectRef, {
                                                     promptRuleId: newPromptRuleId
                                                 });
@@ -1107,7 +1107,7 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                                         const newDesignRuleId = e.target.value;
                                         if (project?.id) {
                                             try {
-                                                const correctProjectRef = doc(db, 'apps', '2h_web_solutions_central_hub_v1', 'projects', project.id);
+                                                const correctProjectRef = doc(db, 'apps', '2h_hub_v1', 'projects', project.id);
                                                 await updateDoc(correctProjectRef, {
                                                     designRuleId: newDesignRuleId
                                                 });

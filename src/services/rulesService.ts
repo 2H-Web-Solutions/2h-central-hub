@@ -12,7 +12,7 @@ export interface Rule {
     updatedAt: Timestamp;
 }
 
-const RULES_COLLECTION = 'apps/2h_web_solutions_central_hub_v1/rules';
+const RULES_COLLECTION = 'apps/2h_hub_v1/rules';
 
 /**
  * Generates a slugified string from a title.

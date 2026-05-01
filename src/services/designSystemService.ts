@@ -9,7 +9,7 @@ export interface DesignSystem {
     updatedAt?: Timestamp;
 }
 
-const COLLECTION_PATH = 'apps/2h_web_solutions_central_hub_v1/design_systems';
+const COLLECTION_PATH = 'apps/2h_hub_v1/design_systems';
 
 export const designSystemService = {
     // 1. Get all design systems
