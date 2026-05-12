@@ -213,20 +213,38 @@ export default async function handler(req, res) {
       }
     });
 
-    // Format history for startChat
-    // Incoming: [{ role: 'user'|'ai', content: '...' }]
-    // Outgoing: [{ role: 'user'|'model', parts: [{ text: '...' }] }]
-    const chatHistory = (history || []).map(msg => ({
-      role: msg.role === 'ai' ? 'model' : 'user',
-      parts: [{ text: msg.content }]
-    }));
+    // Format history for startChat: ensure strict alternation to prevent API errors
+    const chatHistory = [];
+    let currentRole = null;
+    let currentText = '';
+
+    (history || []).forEach(msg => {
+      const mappedRole = msg.role === 'ai' ? 'model' : 'user';
+      if (mappedRole === currentRole) {
+        currentText += '\n\n' + msg.content;
+      } else {
+        if (currentRole) {
+          chatHistory.push({ role: currentRole, parts: [{ text: currentText }] });
+        }
+        currentRole = mappedRole;
+        currentText = msg.content;
+      }
+    });
+
+    let messageParts = [];
+    if (currentRole === 'user') {
+      // Prepend the last user message to the current input to avoid consecutive user turns
+      messageParts.push({ text: currentText + '\n\n' + message });
+    } else {
+      if (currentRole) {
+        chatHistory.push({ role: currentRole, parts: [{ text: currentText }] });
+      }
+      messageParts.push({ text: message });
+    }
 
     const chat = model.startChat({
       history: chatHistory
     });
-
-    // Prepare message parts including potential images
-    let messageParts = [{ text: message }];
 
     if (images && Array.isArray(images)) {
       images.forEach(img => {
@@ -270,14 +288,9 @@ export default async function handler(req, res) {
             streamResult = await chat.sendMessageStream(nextInput);
         }
 
-        let functionCalls = [];
         let textGenerated = false;
 
         for await (const chunk of streamResult.stream) {
-            const calls = chunk.functionCalls();
-            if (calls && calls.length > 0) {
-                functionCalls = functionCalls.concat(calls);
-            }
             try {
                 const textChunk = chunk.text();
                 if (textChunk) {
@@ -295,7 +308,8 @@ export default async function handler(req, res) {
 
         // CRITICAL: Await the full response to ensure the SDK updates the internal chat.history 
         // with the functionCall turn BEFORE we send the functionResponse turn.
-        await streamResult.response;
+        const finalResponse = await streamResult.response;
+        const functionCalls = finalResponse.functionCalls() || [];
 
         if (functionCalls.length === 0) {
             // No more function calls, we are done
