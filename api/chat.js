@@ -306,79 +306,99 @@ export default async function handler(req, res) {
             }
         }
 
-        // CRITICAL: Await the full response to ensure the SDK updates the internal chat.history 
-        // with the functionCall turn BEFORE we send the functionResponse turn.
-        const finalResponse = await streamResult.response;
-        const functionCalls = finalResponse.functionCalls() || [];
+        let finishReason = null;
+        try {
+            const finalResponse = await streamResult.response;
+            if (finalResponse.candidates && finalResponse.candidates.length > 0) {
+                finishReason = finalResponse.candidates[0].finishReason;
+            }
+            const functionCalls = finalResponse.functionCalls() || [];
 
-        if (functionCalls.length === 0) {
-            // No more function calls, we are done
-            if (!textGenerated && toolCallLogs.length > 0) {
-                sendEvent({ type: 'chunk', text: `\n\n[System: The AI processed the following files but didn't generate a text response:\n- ${toolCallLogs.join('\n- ')}]` });
+            if (functionCalls.length === 0) {
+                // No more function calls, we are done
+                if (!textGenerated) {
+                    if (toolCallLogs.length > 0) {
+                        sendEvent({ type: 'chunk', text: `\n\n[System: The AI processed the following files but didn't generate a text response:\n- ${toolCallLogs.join('\n- ')}]` });
+                    } else {
+                        // If no text was generated and no tools were called, check finishReason
+                        if (finishReason && finishReason !== 'STOP') {
+                            sendEvent({ type: 'chunk', text: `\n\n[System: Response halted due to ${finishReason}]` });
+                        } else {
+                            sendEvent({ type: 'chunk', text: `\n\n[System: The AI returned an empty response. Try rephrasing your prompt.]` });
+                        }
+                    }
+                }
+                break;
+            }
+
+            sendEvent({ type: 'status', message: `🛠️ KI ruft Tools auf (${functionCalls.length})...` });
+
+            const functionResponses = await Promise.all(functionCalls.map(async (call) => {
+            const functionResponses = await Promise.all(functionCalls.map(async (call) => {
+                if (call.name === 'read_github_file') {
+                    console.log(`[Tool] Reading file: ${call.args.filePath}`);
+                    const fileContent = await fetchGithubFile(repoUrl, call.args.filePath);
+                    toolCallLogs.push(`Read ${call.args.filePath}: ${fileContent.startsWith('Error') ? 'Failed' : 'Success'}`);
+                    
+                    return {
+                        functionResponse: {
+                        name: 'read_github_file',
+                        response: { content: fileContent }
+                        }
+                    };
+                } else if (call.name === 'search_project_datasets') {
+                    console.log(`[Tool] Searching datasets for query: ${call.args.query}`);
+                    let searchResult = "No datasets available to search.";
+
+                    if (datasets && datasets.length > 0) {
+                        try {
+                        const embeddingModel = genAI.getGenerativeModel({ model: 'gemini-embedding-2-preview' });
+                        const embedResult = await embeddingModel.embedContent(call.args.query);
+                        const queryVector = embedResult.embedding.values;
+
+                        const scoredDatasets = datasets.map(d => ({
+                            text: d.text,
+                            score: cosineSimilarity(queryVector, d.vector)
+                        }));
+
+                        scoredDatasets.sort((a, b) => b.score - a.score);
+
+                        const topMatches = scoredDatasets.slice(0, 5).map(m => `[Relevance Score: ${m.score.toFixed(3)}]\n${m.text}`);
+                        searchResult = `Found the following relevant excerpts from uploaded datasets:\n\n${topMatches.join('\n\n---NEXT EXCERPT---\n\n')}`;
+                        } catch (err) {
+                        console.error("Vector search failed:", err);
+                        searchResult = `Search failed due to an error: ${err.message}`;
+                        }
+                    }
+
+                    toolCallLogs.push(`Searched datasets for "${call.args.query}". Matches found: ${datasets && datasets.length > 0 ? 'Yes' : 'No'}`);
+                    
+                    return {
+                        functionResponse: {
+                        name: 'search_project_datasets',
+                        response: { content: searchResult }
+                        }
+                    };
+                } else {
+                    console.warn(`[Tool] Unknown function call: ${call.name}`);
+                    return {
+                        functionResponse: {
+                        name: call.name,
+                        response: { error: "Unknown function call" }
+                        }
+                    };
+                }
+            }));
+
+            nextInput = functionResponses;
+            turnCount++;
+        } catch (innerError) {
+            console.error("Error during stream processing:", innerError);
+            if (!textGenerated) {
+                sendEvent({ type: 'chunk', text: `\n\n[System: Internal processing error: ${innerError.message}]` });
             }
             break;
         }
-
-      sendEvent({ type: 'status', message: `🛠️ KI ruft Tools auf (${functionCalls.length})...` });
-
-      const functionResponses = await Promise.all(functionCalls.map(async (call) => {
-        if (call.name === 'read_github_file') {
-          console.log(`[Tool] Reading file: ${call.args.filePath}`);
-          const fileContent = await fetchGithubFile(repoUrl, call.args.filePath);
-          toolCallLogs.push(`Read ${call.args.filePath}: ${fileContent.startsWith('Error') ? 'Failed' : 'Success'}`);
-          
-          return {
-            functionResponse: {
-              name: 'read_github_file',
-              response: { content: fileContent }
-            }
-          };
-        } else if (call.name === 'search_project_datasets') {
-          console.log(`[Tool] Searching datasets for query: ${call.args.query}`);
-          let searchResult = "No datasets available to search.";
-
-          if (datasets && datasets.length > 0) {
-            try {
-              const embeddingModel = genAI.getGenerativeModel({ model: 'gemini-embedding-2-preview' }); // Use text-embedding-004 fallback if this fails, but it usually catches
-              const embedResult = await embeddingModel.embedContent(call.args.query);
-              const queryVector = embedResult.embedding.values;
-
-              const scoredDatasets = datasets.map(d => ({
-                text: d.text,
-                score: cosineSimilarity(queryVector, d.vector)
-              }));
-
-              scoredDatasets.sort((a, b) => b.score - a.score);
-
-              const topMatches = scoredDatasets.slice(0, 5).map(m => `[Relevance Score: ${m.score.toFixed(3)}]\n${m.text}`);
-              searchResult = `Found the following relevant excerpts from uploaded datasets:\n\n${topMatches.join('\n\n---NEXT EXCERPT---\n\n')}`;
-            } catch (err) {
-              console.error("Vector search failed:", err);
-              searchResult = `Search failed due to an error: ${err.message}`;
-            }
-          }
-
-          toolCallLogs.push(`Searched datasets for "${call.args.query}". Matches found: ${datasets && datasets.length > 0 ? 'Yes' : 'No'}`);
-          
-          return {
-            functionResponse: {
-              name: 'search_project_datasets',
-              response: { content: searchResult }
-            }
-          };
-        } else {
-          console.warn(`[Tool] Unknown function call: ${call.name}`);
-          return {
-            functionResponse: {
-              name: call.name,
-              response: { error: "Unknown function call" }
-            }
-          };
-        }
-      }));
-
-      nextInput = functionResponses;
-      turnCount++;
     }
 
     sendEvent({ type: 'done' });
