@@ -334,7 +334,6 @@ export default async function handler(req, res) {
             sendEvent({ type: 'status', message: `🛠️ KI ruft Tools auf (${functionCalls.length})...` });
 
             const functionResponses = await Promise.all(functionCalls.map(async (call) => {
-            const functionResponses = await Promise.all(functionCalls.map(async (call) => {
                 if (call.name === 'read_github_file') {
                     console.log(`[Tool] Reading file: ${call.args.filePath}`);
                     const fileContent = await fetchGithubFile(repoUrl, call.args.filePath);
