@@ -242,9 +242,7 @@ export default async function handler(req, res) {
       messageParts.push({ text: message });
     }
 
-    const chat = model.startChat({
-      history: chatHistory
-    });
+    let contents = [...chatHistory];
 
     if (images && Array.isArray(images)) {
       images.forEach(img => {
@@ -276,17 +274,13 @@ export default async function handler(req, res) {
         if (res.flush) res.flush();
     };
 
-    let nextInput = messageParts;
-    let isFirstTurn = true;
+    let nextInputParts = messageParts;
 
     while (turnCount < MAX_TURNS) {
-        let streamResult;
-        if (isFirstTurn) {
-            streamResult = await chat.sendMessageStream(nextInput);
-            isFirstTurn = false;
-        } else {
-            streamResult = await chat.sendMessageStream(nextInput);
-        }
+        // Append the incoming message (user text or tool response) to history
+        contents.push({ role: 'user', parts: nextInputParts });
+
+        const streamResult = await model.generateContentStream({ contents });
 
         let textGenerated = false;
 
@@ -311,6 +305,13 @@ export default async function handler(req, res) {
             const finalResponse = await streamResult.response;
             if (finalResponse.candidates && finalResponse.candidates.length > 0) {
                 finishReason = finalResponse.candidates[0].finishReason;
+                // Append the model's response to history, so the next tool response has the correct preceding turn
+                if (finalResponse.candidates[0].content && finalResponse.candidates[0].content.parts) {
+                    contents.push({
+                        role: 'model',
+                        parts: finalResponse.candidates[0].content.parts
+                    });
+                }
             }
             const functionCalls = finalResponse.functionCalls() || [];
 
@@ -389,7 +390,7 @@ export default async function handler(req, res) {
                 }
             }));
 
-            nextInput = functionResponses;
+            nextInputParts = functionResponses;
             turnCount++;
         } catch (innerError) {
             console.error("Error during stream processing:", innerError);

@@ -170,6 +170,8 @@ export default function ProjectDetails() {
     const [missingOverrides, setMissingOverrides] = useState<Record<string, string>>({});
     const [generatedPrompt, setGeneratedPrompt] = useState<string>('');
     const [missingKeys, setMissingKeys] = useState<string[]>([]);
+    const [allDetectedKeys, setAllDetectedKeys] = useState<string[]>([]);
+    const [resolvedVars, setResolvedVars] = useState<Record<string, string>>({});
     const [promptCopied, setPromptCopied] = useState(false);
 
     // Fetch Project Rules and Design Systems
@@ -227,6 +229,8 @@ export default function ProjectDetails() {
         const result = parseRuleTemplate(rule.content, projectData, missingOverrides);
         setGeneratedPrompt(result.parsedTemplate);
         setMissingKeys(result.missingKeys);
+        setAllDetectedKeys(result.allKeys);
+        setResolvedVars(result.resolvedValues);
     }, [selectedRuleId, project, rules, missingOverrides]);
 
     const handlePromptCopy = () => {
@@ -1164,26 +1168,31 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                                 </button>
                             </div>
 
-                            {/* Missing Variables Fallback */}
-                            {missingKeys.length > 0 && (
-                                <div className="bg-orange-50 border border-orange-100 rounded-lg p-4 space-y-3">
-                                    <p className="text-xs font-bold text-orange-800 flex items-center gap-1.5">
-                                        <AlertTriangle size={14} /> 
-                                        Missing Variables Detected
+                            {/* Template Variables Editor */}
+                            {allDetectedKeys.length > 0 && (
+                                <div className="bg-gray-50 border border-gray-100 rounded-lg p-4 space-y-3">
+                                    <p className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                                        <Sparkles size={14} className="text-[#B7EF02]" /> 
+                                        Template Variables
                                     </p>
                                     <div className="grid grid-cols-2 gap-3">
-                                        {missingKeys.map(key => (
-                                            <div key={key}>
-                                                <label className="block text-[10px] font-bold text-orange-700 uppercase tracking-wider mb-1">{key}</label>
-                                                <input
-                                                    type="text"
-                                                    value={missingOverrides[key] || ''}
-                                                    onChange={(e) => setMissingOverrides(prev => ({ ...prev, [key]: e.target.value }))}
-                                                    placeholder={`Enter ${key}...`}
-                                                    className="w-full px-2 py-1.5 rounded-md border border-orange-200 text-xs font-mono focus:border-orange-400 outline-none bg-white"
-                                                />
-                                            </div>
-                                        ))}
+                                        {allDetectedKeys.map(key => {
+                                            const isMissing = missingKeys.includes(key);
+                                            return (
+                                                <div key={key}>
+                                                    <label className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${isMissing ? 'text-orange-600' : 'text-gray-500'}`}>
+                                                        {key} {isMissing && '*'}
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={missingOverrides[key] !== undefined ? missingOverrides[key] : (resolvedVars[key] || '')}
+                                                        onChange={(e) => setMissingOverrides(prev => ({ ...prev, [key]: e.target.value }))}
+                                                        placeholder={`Enter ${key}...`}
+                                                        className={`w-full px-2 py-1.5 rounded-md border text-xs font-mono outline-none focus:border-[#B7EF02] ${isMissing && !missingOverrides[key] ? 'border-orange-300 bg-orange-50' : 'border-gray-200 bg-white'}`}
+                                                    />
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             )}
@@ -1354,17 +1363,18 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                                                     </div>
                                                     <div className="flex items-center gap-3">
                                                         <span className="text-xs font-mono text-gray-400 bg-white px-2 py-1 rounded border border-gray-100">{log.date}</span>
-                                                        <button
+                                                        <span
+                                                            role="button"
                                                             onClick={(e) => {
                                                                 e.preventDefault();
                                                                 e.stopPropagation();
                                                                 handleDeleteEntry(idx);
                                                             }}
-                                                            className="text-gray-300 hover:text-red-500 transition-colors p-1"
+                                                            className="text-gray-300 hover:text-red-500 transition-colors p-1 cursor-pointer"
                                                             title="Delete Entry"
                                                         >
                                                             <Trash2 size={14} />
-                                                        </button>
+                                                        </span>
                                                     </div>
                                                 </summary>
                                                 <div className="px-4 pb-4 pt-0 text-sm text-gray-600 whitespace-pre-wrap leading-relaxed pl-8 border-t border-gray-50 mt-2">
