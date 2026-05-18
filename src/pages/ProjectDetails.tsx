@@ -1580,7 +1580,7 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                                                         a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline hover:text-blue-800">{children}</a>
                                                     }}
                                                 >
-                                                    {msg.content}
+                                                    {msg.content || ''}
                                                 </ReactMarkdown>
                                             </div>
                                             {msg.role !== 'user' && (
@@ -1634,7 +1634,7 @@ VITE_FIREBASE_APP_ID=${fbAppId}`;
                                                         a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline hover:text-blue-800">{children}</a>
                                                     }}
                                                 >
-                                                    {streamedMessage}
+                                                    {streamedMessage || ''}
                                                 </ReactMarkdown>
                                                 <span className="inline-block w-2 h-4 bg-brand-black ml-1 animate-ping" />
                                             </div>
