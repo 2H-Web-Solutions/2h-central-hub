@@ -4,6 +4,7 @@ import { db } from '../lib/firebase';
 export interface DesignSystem {
     id: string;
     title: string;
+    category?: string;
     content: string;
     createdAt?: Timestamp;
     updatedAt?: Timestamp;

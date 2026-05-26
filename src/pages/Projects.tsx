@@ -33,6 +33,7 @@ interface Project {
     };
     promptRuleId?: string;
     designRuleId?: string;
+    defaultRuleId?: string;
 }
 
 interface Client {
@@ -352,7 +353,7 @@ VITE_FIREBASE_APP_ID=${firebaseConfig.appId || 'Pending'}
             await setDoc(doc(db, 'apps', '2h_hub_v1', 'projects', appId), newProjectData);
             
             setIsWizardOpen(false);
-            setSuccessProject({ id: appId, ...newProjectData } as Project);
+            setSuccessProject({ id: appId, ...newProjectData } as any as Project);
             resetForm();
         } catch (error) {
             console.error("Error creating project: ", error);
@@ -377,7 +378,7 @@ VITE_FIREBASE_APP_ID=${firebaseConfig.appId || 'Pending'}
                     APP_TYPE: successProject.type
                 };
 
-                const parsedContent = parseRuleTemplate(rule.content, variables);
+                const parsedContent = parseRuleTemplate(rule.content, variables).parsedTemplate;
 
                 const blob = new Blob([parsedContent], { type: 'text/markdown' });
                 const url = window.URL.createObjectURL(blob);

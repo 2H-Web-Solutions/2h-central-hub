@@ -246,7 +246,7 @@ export default function RuleEditor() {
                                 <h3 className="font-bold text-[#101010] text-sm mb-3">Available Variables</h3>
                                 <p className="text-xs text-gray-500 mb-4">Click a variable to insert it at the cursor position (or append to end).</p>
                                 <div className="flex flex-wrap gap-2">
-                                    {['{project_name}', '{app_id}', '{github_repo}', '{primary_color}', '{secondary_color}', '{tertiary_color}', '{language}', '{ai_model}', '{firebase_project_id}', '{firebase_api_key}', '{firebase_auth_domain}', '{firebase_storage_bucket}', '{firebase_messaging_sender_id}', '{firebase_app_id}'].map(variable => (
+                                    {['{project_name}', '{app_id}', '{github_repo}', '{language}', '{ai_model}', '{firebase_project_id}', '{firebase_api_key}', '{firebase_auth_domain}', '{firebase_storage_bucket}', '{firebase_messaging_sender_id}', '{firebase_app_id}'].map(variable => (
                                         <button
                                             key={variable}
                                             onClick={() => {

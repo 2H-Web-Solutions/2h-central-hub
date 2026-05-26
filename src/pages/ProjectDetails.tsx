@@ -42,6 +42,7 @@ interface Project {
     language?: 'en' | 'de';
     promptRuleId?: string;
     designRuleId?: string;
+    defaultRuleId?: string;
     designConfig?: {
         fontHeading?: string;
         fontBody?: string;
@@ -288,9 +289,9 @@ export default function ProjectDetails() {
                 firebase_storage_bucket: project.firebaseConfig?.storageBucket,
                 firebase_messaging_sender_id: project.firebaseConfig?.messagingSenderId,
                 firebase_app_id: project.firebaseConfig?.appId,
-                primary: project.primaryColor,
-                secondary: project.secondaryColor,
-                tertiary: project.tertiaryColor,
+                primary: project.designConfig?.primaryColor,
+                secondary: project.designConfig?.secondaryColor,
+                tertiary: project.designConfig?.tertiaryColor,
                 memory: project.memory
             };
 

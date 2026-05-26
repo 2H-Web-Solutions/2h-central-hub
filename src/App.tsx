@@ -25,10 +25,14 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+    const { user } = useAuth();
+    
     useEffect(() => {
-        // Run one-time recovery
-        recoverData();
-    }, []);
+        if (user) {
+            // Run one-time recovery only when authenticated
+            recoverData();
+        }
+    }, [user]);
 
     return (
         <>
