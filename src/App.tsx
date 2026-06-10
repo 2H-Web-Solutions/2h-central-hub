@@ -6,6 +6,7 @@ import Tasks from './pages/Tasks';
 import Agents from './pages/Agents';
 import Projects from './pages/Projects';
 import ProjectDetails from './pages/ProjectDetails';
+import Websites from './pages/Websites';
 import Login from './pages/Login';
 import RulesDashboard from './pages/settings/RulesDashboard';
 import RuleEditor from './pages/settings/RuleEditor';
@@ -46,6 +47,7 @@ function App() {
                 <Route path="/agents" element={<ProtectedRoute><Agents /></ProtectedRoute>} />
                 <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
                 <Route path="/projects/:projectId" element={<ProtectedRoute><ProjectDetails /></ProtectedRoute>} />
+                <Route path="/websites" element={<ProtectedRoute><Websites /></ProtectedRoute>} />
                 
                 {/* Settings / Rules */}
                 <Route path="/settings/rules" element={<ProtectedRoute><RulesDashboard /></ProtectedRoute>} />

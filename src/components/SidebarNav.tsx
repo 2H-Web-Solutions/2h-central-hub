@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, CheckSquare, Bot, Briefcase, Settings, LogOut, BookOpen, Palette } from 'lucide-react';
+import { LayoutDashboard, Users, CheckSquare, Bot, Briefcase, Settings, LogOut, BookOpen, Palette, Globe } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function SidebarNav() {
@@ -11,6 +11,7 @@ export default function SidebarNav() {
         { path: '/clients', label: 'Clients', icon: Users },
         { path: '/tasks', label: 'Tasks', icon: CheckSquare },
         { path: '/agents', label: 'Agents', icon: Bot },
+        { path: '/websites', label: 'Websites', icon: Globe },
         { path: '/projects', label: 'App Factory', icon: Briefcase },
     ];
 
