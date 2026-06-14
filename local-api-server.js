@@ -1,6 +1,6 @@
+import http from 'http';
 import express from 'express';
 import dotenv from 'dotenv';
-import { createRequire } from 'module';
 
 dotenv.config({ path: '.env.local' });
 
@@ -19,7 +19,7 @@ const mountRoute = async (path, modulePath) => {
   }
 };
 
-const start = async () => {
+async function main() {
   console.log('\n🚀 Starting local API server...\n');
 
   await mountRoute('/api/chat', './api/chat.js');
@@ -29,9 +29,11 @@ const start = async () => {
   await mountRoute('/api/refine-memory', './api/refine-memory.js');
   await mountRoute('/api/smart-archive', './api/smart-archive.js');
 
-  app.listen(3000, () => {
+  // Use http.createServer to guarantee the process stays alive
+  const server = http.createServer(app);
+  server.listen(3000, () => {
     console.log('\n✅ Local API server running on http://localhost:3000\n');
   });
-};
+}
 
-start();
+main();
